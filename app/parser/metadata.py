@@ -1,28 +1,32 @@
-import re 
+import re
 
 def extract_metadata(lines):
-
     metadata = {
-        "BRANCH_CODE" : "UNKNOWN",
-        "BRANCH_NAME" : "UNKNOWN",
-        "PROC_DATE" : "UNKNOWN"
+        "REPORT_ID": "UNKNOWN",
+        "BRANCH_CODE": "UNKNOWN",
+        "BRANCH_NAME": "UNKNOWN",
+        "PROC_DATE": "UNKNOWN"
     }
 
     for line in lines[:20]:
-        line_upper = line.upper()
+        if metadata["REPORT_ID"] == "UNKNOWN":
+            m = re.search(r"REPORT ID\s*:\s*([A-Z0-9\-]+)", line, re.IGNORECASE)
+            if m:
+                metadata["REPORT_ID"] = m.group(1).upper()
 
-        if "DATE" in line_upper:
-            date_match = re.search(r"\d{2}/\d{2}/\d{4}", line_upper)
+        if metadata["PROC_DATE"] == "UNKNOWN" and "DATE" in line.upper():
+            m = re.search(r"\d{2}/\d{2}/\d{4}", line)
+            if m:
+                metadata["PROC_DATE"] = m.group()
 
-            if date_match:
-                metadata["PROC_DATE"] = date_match.group()
-        
-        branch_match = re.search(r"BRANCH[^\d]+(\d+)\s+([A-Za-z ]+)", line_upper)
-        if branch_match:
-            metadata["BRANCH_CODE"] = branch_match.group(1).strip()
+        if metadata["BRANCH_CODE"] == "UNKNOWN":
+            m = re.search(r"BRANCH[- ]?NO\.?\s*:?-?\s*(\d+)", line, re.IGNORECASE)
+            if m:
+                metadata["BRANCH_CODE"] = m.group(1)
 
-            name = branch_match.group(2).split(" ")[0].strip()
-            name = name.split("PROC")[0].strip()
-            metadata["BRANCH_NAME"] = name
+        if metadata["BRANCH_NAME"] == "UNKNOWN":
+            m = re.search(r"BRANCH[- ]?NAME\s*:?-?\s*([A-Za-z0-9&.,() ]+?)(?:\s{2,}|$)", line, re.IGNORECASE)
+            if m:
+                metadata["BRANCH_NAME"] = m.group(1).strip()
 
     return metadata

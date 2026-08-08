@@ -36,13 +36,22 @@ def extract_columns_from_headers(header_lines, data_lines, separator_line=None):
             is_space = [True] * max_len
             
     if not use_separator:
-        # Fallback: Vertical projection on all lines
-        for line in all_lines:
+    # Header/data content lines: sirf actual SPACE ko blank maano
+    # ('-' jaise "SR-NO" ka hyphen data hai, blank nahi)
+        content_lines = header_lines + data_lines
+        for line in content_lines:
             line = line.ljust(max_len)
             for i in range(max_len):
-                if line[i] not in [' ', '-', '=']:
+                if line[i] != ' ':
                     is_space[i] = False
-                
+
+    # Separator line ('------' jaisi decorative line) ke '-'/'=' ko
+    # blank maano — yehi hai jaha ye rule sahi mayne rakhta hai
+    if separator_line:
+        sep = separator_line.ljust(max_len)
+        for i in range(max_len):
+            if sep[i] not in [' ', '-', '=']:
+                is_space[i] = False
     # Find contiguous blocks of False (data columns)
     columns = []
     in_col = False
