@@ -44,7 +44,18 @@ def process_file(filepath):
     print("--- End preview ---\n")
 
     column_names = list(rows[0].keys())
-    primary_key_columns = ["SR_NO", "BRANCH_CODE", "PROC_DATE"]
+    
+    primary_key_columns = ["BRANCH_CODE", "PROC_DATE"]
+    if "SR_NO" in column_names:
+        primary_key_columns = ["SR_NO", "BRANCH_CODE", "PROC_DATE"]
+    elif "SLNO" in column_names:
+        primary_key_columns = ["SLNO", "GL_CLASS_CODE", "BRANCH_CODE", "PROC_DATE"]
+    elif "GL_CLASS_CODE" in column_names:
+        if "NAME" in column_names:
+            primary_key_columns = ["GL_CLASS_CODE", "NAME", "BRANCH_CODE", "PROC_DATE"]
+        else:
+            primary_key_columns = ["GL_CLASS_CODE", "BRANCH_CODE", "PROC_DATE"]
+        
     table = create_table_if_not_exists(table_name, column_names, primary_key_columns)
     insert_rows(table, rows, primary_key_columns)
     print(f"OK: {filepath} -> {table_name} ({len(rows)} rows)")
