@@ -26,6 +26,10 @@ def parse(raw_lines):
         # So we can check if it has a long alphanumeric code
         if len(line) > 40:
             act_total_str = line[40:51].strip()
+            if act_total_str.isdigit():
+                gl_class_code = line[0:40].strip()
+                act_total = act_total_str
+                
                 import re
                 
                 rest = line[51:116].strip()
