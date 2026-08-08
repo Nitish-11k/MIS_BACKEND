@@ -1,0 +1,103 @@
+
+REPORT ID: ACTCLS-01                             JAMMU CENTRL CO-OPERATIVE BANK                          RUN DATE: 25/04/2025  23:28
+AREA:                                                                                                   PROC DATE: 25/04/2025
+                                         LIST OF ACCOUNTS CLOSED
+BRANCH-NO:-  00001     BRANCH-NAME:- HEAD OFFICE                                                            PAGE-NO:    1
+------------------------------------------------------------------------------------------------------------------------------------------
+SR-NO    ACCOUNT-NUMBER       CUSTOMER-NO ACCOUNT-NAME                              PRODUCT PRODUCT-DESCRIPTION            CLOSED-DATE SYS
+------------------------------------------------------------------------------------------------------------------------------------------
+    1      809010001652      601010016712  BELA  DEVI                              10263100 EMPLOYEE CASH SECURITY         02/04/2025  DEP
+    2      809010005341      601010016712  BELA  DEVI                              10273100 STAFF PROVIDENT FUND           02/04/2025  DEP
+    3      809010005635      601010019338 Mr. PAWAN  KUMAR                         10273100 STAFF PROVIDENT FUND           02/04/2025  DEP
+    4      809010006752      601010016712  BELA  DEVI                              10285100 BANK CONTRIBUTION OF PF        02/04/2025  DEP
+    5      809010006990      601010019338 Mr. PAWAN  KUMAR                         10285100 BANK CONTRIBUTION OF PF        02/04/2025  DEP
+    6      809720007205      601720007201  BELA  DEVI                              61591001 Cash Credit - Rahat Staff Offi 02/04/2025  OD
+    7      809800017451      601800028254 Mr. PAWAN KUMAR SHARMA S/O LATE SRI  MAN 61591001 Cash Credit - Rahat Staff Offi 02/04/2025  OD
+    8      809800017495      601800028254 Mr. PAWAN KUMAR SHARMA S/O LATE SRI  MAN 61591001 Cash Credit - Rahat Staff Offi 02/04/2025  OD
+    9      809720007216      601720007212  BELA  DEVI                              61591002 CC Rahat Staff Officers Prt II 02/04/2025  OD
+   10      809010031042      601010019338 Mr. PAWAN  KUMAR                         62591004 LOAN AGAINST PF STAFF (Co      03/04/2025  LON
+   11      809010031393      601010016712  BELA  DEVI                              62591004 LOAN AGAINST PF STAFF (Co      03/04/2025  LON
+   12      809010037271      601010019429 Mr. RAHUL  KAPOOR                        62595001 Festival Advance With Int      03/04/2025  LON
+   13      809010024364      601010019429 Mr. RAHUL  KAPOOR                        62595004 Festival Advance Without       03/04/2025  LON
+   14      809010030264      601010010120 Mr. BALWANT  SINGH                       62592004 Staff Housing Loan Office      19/04/2025  LON
+   15      809010031360      601010010641 Mr. BALWANT  SINGH                       62592004 Staff Housing Loan Office      19/04/2025  LON
+   16      809010030923      601010010969 Mr. SANJAY  MAGOTRA                      62592004 Staff Housing Loan Office      21/04/2025  LON
+   17      809010034510      601010012707 Mr. RAHUL  MOTAN                         62591002 Staff Personal Consumptio      25/04/2025  LON
+   18      809010031609      601010004999 Mr. SUMIT SINGH SAMBYAL S/O SH GANPATI S 62595001 Festival Advance With Int      25/04/2025  LON
+   19      809010031610      601010015390  SONAL  BAKSHI                           62595001 Festival Advance With Int      25/04/2025  LON
+   20      809010031621      601010014806 Mr. SANDEEP  RAINA                       62595001 Festival Advance With Int      25/04/2025  LON
+   21      809010031632      601010014158 Mr. RAJI  BHUSHAN                        62595001 Festival Advance With Int      25/04/2025  LON
+   22      809010031643      601010004183 Mr. MADAN  LAL                           62595001 Festival Advance With Int      25/04/2025  LON
+   23      809010031654      601010015833 Mr. TILAK  RAJ                           62595001 Festival Advance With Int      25/04/2025  LON
+   24      809010031665      601010001909 Mr. SUKHDEV  KATOCH                      62595001 Festival Advance With Int      25/04/2025  LON
+   25      809010031789      601010004886 Mr. BHARAT BHUSHAN KHAJURIA S/O SH VIJAY 62595001 Festival Advance With Int      25/04/2025  LON
+   26      809010031790      601010005052 Mr. RAHGHUVINDER SINGH JAMWAL S/O SH PIT 62595001 Festival Advance With Int      25/04/2025  LON
+   27      809010031803      601010005347 Mr. RAKESH GUPTA S/O SH JAGDISH RAJ GUPT 62595001 Festival Advance With Int      25/04/2025  LON
+   28      809010031825      601010004988 Mr. RAHUL GUPTA S/O SH SUBASH GUPTA      62595001 Festival Advance With Int      25/04/2025  LON
+   29      809010031836      601010019893 Mr. SUKHDEV  SHARMA                      62595001 Festival Advance With Int      25/04/2025  LON
+   30      809010032035      601010002299 Mr. ZAHEER  ABASS                        62595001 Festival Advance With Int      25/04/2025  LON
+   31      809010032046      601010019247 Mr. NISHAT  ALI                          62595001 Festival Advance With Int      25/04/2025  LON
+   32      809010032057      601010008632 Mr. ANKUSH BHARTI S/O LATE ASHOK KUMAR   62595001 Festival Advance With Int      25/04/2025  LON
+   33      809010032068      601010017885 Mr. ABDUL  AZIZ                          62595001 Festival Advance With Int      25/04/2025  LON
+   34      809010032079      601010010051 Mr. SAHIL  KUMAR                         62595001 Festival Advance With Int      25/04/2025  LON
+   35      809010032080      601010014851 Mr. SANJEEV  JAIN                        62595001 Festival Advance With Int      25/04/2025  LON
+   36      809010032091      601010022056 Mr. DEEPU  SINGH                         62595001 Festival Advance With Int      25/04/2025  LON
+   37      809010032104      601010009953  MALIKA SALGOTRA D/O LT SH SUDESH KUMAR  62595001 Festival Advance With Int      25/04/2025  LON
+   38      809010032115      601010016166  ARTI  KUMARI                            62595001 Festival Advance With Int      25/04/2025  LON
+   39      809010032206      601010018970 Mr. MICHAEL  GILL                        62595001 Festival Advance With Int      25/04/2025  LON
+   40      809010033129      601010014545  ROMA  BABBER                            62595001 Festival Advance With Int      25/04/2025  LON
+   41      809010033130      601010014737 Mr. S K MEHRA                            62595001 Festival Advance With Int      25/04/2025  LON
+   42      809010033141      601010015265  SHEETAL  GUPTA                          62595001 Festival Advance With Int      25/04/2025  LON
+   43      809010033152      601010003236  SALIMA  BANO                            62595001 Festival Advance With Int      25/04/2025  LON
+   44      809010033163      601010006442 Mr. INDER SINGH PEON                     62595001 Festival Advance With Int      25/04/2025  LON
+   45      809010033174      601010004831 Mr. GURPREET SINGH S/O SH TEJ SINGH      62595001 Festival Advance With Int      25/04/2025  LON
+   46      809010033185      601010018674 Mr. JASBINDER  SINGH                     62595001 Festival Advance With Int      25/04/2025  LON
+   47      809010033196      601010005700 Mr. VIJAY KUMAR S/O ROMESH CHANDER       62595001 Festival Advance With Int      25/04/2025  LON
+   48      809010035819      601010006689 Mr. HARJEET  SINGH                       62595001 Festival Advance With Int      25/04/2025  LON
+   49      809010035820      601010006497 Mr. RAHUL  MOTAN                         62595001 Festival Advance With Int      25/04/2025  LON
+   50      809010035831      601010004365 Mr. KULJEET SINGH PEON                   62595001 Festival Advance With Int      25/04/2025  LON
+   51      809010035842      601010018641 Mr. JANAK  RAJ                           62595001 Festival Advance With Int      25/04/2025  LON
+   52      809010035853      601010019350  PINKI SAFAI KARAMCHARI                  62595001 Festival Advance With Int      25/04/2025  LON
+------------------------------------------------------------------------------------------------------------------------------------------
+
+REPORT ID: ACTCLS-01                             JAMMU CENTRL CO-OPERATIVE BANK                          RUN DATE: 25/04/2025  23:28
+AREA:                                                                                                   PROC DATE: 25/04/2025
+                                         LIST OF ACCOUNTS CLOSED
+BRANCH-NO:-  00001     BRANCH-NAME:- HEAD OFFICE                                                            PAGE-NO:    2
+------------------------------------------------------------------------------------------------------------------------------------------
+SR-NO    ACCOUNT-NUMBER       CUSTOMER-NO ACCOUNT-NAME                              PRODUCT PRODUCT-DESCRIPTION            CLOSED-DATE SYS
+------------------------------------------------------------------------------------------------------------------------------------------
+   53      809010035864      601010003281 Mr. SH ANIL CHOUDHARY                    62595001 Festival Advance With Int      25/04/2025  LON
+   54      809010035875      601010019441 Mr. RAJESH  KUMAR                        62595001 Festival Advance With Int      25/04/2025  LON
+   55      809010035886      601010012683 Mr. PARDEEP  CHOPRA                      62595001 Festival Advance With Int      25/04/2025  LON
+   56      809010035897      601010006861 Mr. DEEPAK  SINGH                        62595001 Festival Advance With Int      25/04/2025  LON
+   57      809010035900      601010006667 Mr. KAILASHO  DEVI                       62595001 Festival Advance With Int      25/04/2025  LON
+   58      809010035922      601010003305 Mr. SH MANMOHAN SINGH                    62595001 Festival Advance With Int      25/04/2025  LON
+   59      809010035944      601010015720 Mr. SWEETAN  KAPOOR                      62595001 Festival Advance With Int      25/04/2025  LON
+   60      809010035955      601010014078 Mr. R S KOTWAL                           62595001 Festival Advance With Int      25/04/2025  LON
+   61      809010035966      601010006725 Mr. RENU  BALA                           62595001 Festival Advance With Int      25/04/2025  LON
+   62      809010035977      601010006770  KAUSHLYA  DEVI                          62595001 Festival Advance With Int      25/04/2025  LON
+   63      809010035988      601010008621  SUNITA KUMARI W/O LATE RAM PAUL         62595001 Festival Advance With Int      25/04/2025  LON
+   64      809010035999      601010003713 Mr. SH TIRATH SINGH                      62595001 Festival Advance With Int      25/04/2025  LON
+   65      809010036017      601010006351 Mr. GAGNDEEP SHARMA JR CLK               62595001 Festival Advance With Int      25/04/2025  LON
+   66      809010036028      601010007956 Mr. VIKAS VERMA S/O RATTAN CHAND V       62595001 Festival Advance With Int      25/04/2025  LON
+   67      809010036039      601010008938 Mr. NARIAN  DUTT                         62595001 Festival Advance With Int      25/04/2025  LON
+   68      809010036040      601010005132 Mr. VISHAL SHARMA S/O SH RAM KRISHAN     62595001 Festival Advance With Int      25/04/2025  LON
+   69      809010036051      601010005813  SWATI GUPTA D/O SH RAKESH GUPTA         62595001 Festival Advance With Int      25/04/2025  LON
+   70      809010036062      601010005755 Mr. MANAV SHARMA S/O SH LEKH RAJ         62595001 Festival Advance With Int      25/04/2025  LON
+   71      809010036073      601010007491 Mr. BUSHAN  VERMA                        62595001 Festival Advance With Int      25/04/2025  LON
+   72      809010036084      601010005198 Mr. MUNISH KUMAR SHARMA S/O SH TAK       62595001 Festival Advance With Int      25/04/2025  LON
+   73      809010036095      601010018164 Mr. BALWAN  CHAND                        62595001 Festival Advance With Int      25/04/2025  LON
+   74      809010036108      601010006395 Mr. JAVED ABBAS PEON                     62595001 Festival Advance With Int      25/04/2025  LON
+   75      809010036120      601010005018 Mr. PARDEEP SINGH SAMBYAL S/O SH BHAGWAN 62595001 Festival Advance With Int      25/04/2025  LON
+   76      809010036142      601010019871 Mr. SUBASH  CHANDER                      62595001 Festival Advance With Int      25/04/2025  LON
+   77      809010036153      601010003995 Mr. SH NARINDER KUMAR                    62595001 Festival Advance With Int      25/04/2025  LON
+   78      809010036175      601010005879 Mr. PRITESH KAILOO S/O SH VIJAY KUMAR    62595001 Festival Advance With Int      25/04/2025  LON
+   79      809010036233      601010004401  MADHU  SHARMA                           62595001 Festival Advance With Int      25/04/2025  LON
+   80      809010036244      601010005007 Mr. RAMNEEK SINGH S/O SH MOHINDER SINGH  62595001 Festival Advance With Int      25/04/2025  LON
+   81      809010036313      601010009931  JIWAN RITU W/O LT SH RAJESH KUMAR       62595001 Festival Advance With Int      25/04/2025  LON
+   82      809010036324      601010004376 Mr. YOGESH PAUL PEON                     62595001 Festival Advance With Int      25/04/2025  LON
+   83      809010036437      601010008756 Mr. ASHISH KUMAR PADHA S/O LATE SHANKER  62595001 Festival Advance With Int      25/04/2025  LON
+   84      809010037191      601010006497 Mr. RAHUL  MOTAN                         62595001 Festival Advance With Int      25/04/2025  LON
+   85      809010024658      601010006497 Mr. RAHUL  MOTAN                         62595004 Festival Advance Without       25/04/2025  LON
+------------------------------------------------------------------------------------------------------------------------------------------
