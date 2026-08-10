@@ -1,0 +1,35 @@
+from app.parser.formats import gl_daybook_gend0807
+from app.parser.formats import homebranchusers_cfpd0300
+from app.parser.formats import id_least_transaction_lond2482
+from app.parser.formats import credit_balance_in_expense_account_gend7042
+from app.parser.formats import customer_member_report
+from app.parser.formats import daily_productwise_report_loan_dep_clearing_gnbd7376
+from app.parser.formats import debit_balance_in_income_account_gend7041
+from app.parser.formats import debit_transactions_on_income_acct_gend7045
+from app.parser.formats import deposits_balance_file_depd0586
+from app.parser.formats import drawing_power_lond2388
+from app.parser.formats import exception_report_depd0670
+from app.parser.formats import exception_report_for_interest_rates_variation_depd0650
+from app.parser.formats import gend1012_prt
+from app.parser.formats import gend1012_prt2
+from app.parser.formats import dep_shadow_file
+from app.parser.formats import glcc_wise_bal_rep
+from app.parser.formats import glcc_wise_sum_rep
+
+    "GL0807-01": gl_daybook_gend0807.parse,
+    "CF0300-01": homebranchusers_cfpd0300.parse,
+    "BR2482-01": id_least_transaction_lond2482.parse,
+    "GL7042-01": credit_balance_in_expense_account_gend7042.parse,
+    "AU0319-01": customer_member_report.parse,
+    "UNKNOWN_GNBD7376": daily_productwise_report_loan_dep_clearing_gnbd7376.parse,
+    "GL7041-01": debit_balance_in_income_account_gend7041.parse,
+    "GL7045-01": debit_transactions_on_income_acct_gend7045.parse,
+    "IN0586-01": deposits_balance_file_depd0586.parse,
+    "BR2388-01": drawing_power_lond2388.parse,
+    "DEP0670-01": exception_report_depd0670.parse,
+    "IN0650-01": exception_report_for_interest_rates_variation_depd0650.parse,
+    "GL1012-02": gend1012_prt.parse,
+    "GL1012-02_B": gend1012_prt2.parse,
+    "SHADOW-01": dep_shadow_file.parse,
+    "GL7043-01": glcc_wise_bal_rep.parse,
+    "GL7043-02": glcc_wise_sum_rep.parse,

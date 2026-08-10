@@ -22,7 +22,16 @@ def table_name_from_filename(filepath):
 def process_file(filepath):
     raw_lines = read_report_lines(filepath)
     metadata = extract_metadata(raw_lines)
-    report_id = metadata["REPORT_ID"]
+    report_id = metadata.get("REPORT_ID", "UNKNOWN")
+    
+    if report_id == "UNKNOWN" or report_id not in REGISTRY:
+        # Fallback to filename matching if report_id is unknown or not in registry
+        base_name = os.path.basename(filepath).lower()
+        for k in REGISTRY.keys():
+            if k.lower() in base_name:
+                report_id = k
+                print(f"Fallback matched {k} from filename {base_name}")
+                break
 
     if report_id not in REGISTRY:
         print(f"SKIPPED (no parser yet): {filepath}  [REPORT_ID={report_id}]")
@@ -37,15 +46,13 @@ def process_file(filepath):
         print(f"WARNING: 0 rows extracted from {filepath}")
         return None
 
-    print(f"\n--- Preview: {table_name} ({len(rows)} rows total) ---")
-    print("Columns:", list(rows[0].keys()))
-    for row in rows[:5]:
-        print(row)
-    print("--- End preview ---\n")
-
-    column_names = list(rows[0].keys())
+    column_names = [k for k in rows[0].keys() if k != "_IS_SCHEMA_ONLY"]
+    column_names = ["original_id" if c.lower() == "id" else c for c in column_names]
     
-    primary_key_columns = ["BRANCH_CODE", "PROC_DATE"]
+    # Filter out dummy schema rows
+    data_rows = [r for r in rows if not r.get("_IS_SCHEMA_ONLY")]
+
+    primary_key_columns = None
     if "SR_NO" in column_names:
         primary_key_columns = ["SR_NO", "BRANCH_CODE", "PROC_DATE"]
     elif "SLNO" in column_names:
@@ -55,8 +62,28 @@ def process_file(filepath):
             primary_key_columns = ["GL_CLASS_CODE", "NAME", "BRANCH_CODE", "PROC_DATE"]
         else:
             primary_key_columns = ["GL_CLASS_CODE", "BRANCH_CODE", "PROC_DATE"]
+    elif "LOAN_ACCOUNT" in column_names:
+        primary_key_columns = ["LOAN_ACCOUNT", "BRANCH_CODE", "PROC_DATE"]
+    elif "S1_NO" in column_names:
+        primary_key_columns = ["S1_NO", "BRANCH_CODE", "PROC_DATE"]
+    elif "ACCOUNT_NUM" in column_names:
+        primary_key_columns = ["ACCOUNT_NUM", "BRANCH_CODE", "PROC_DATE"]
         
     table = create_table_if_not_exists(table_name, column_names, primary_key_columns)
-    insert_rows(table, rows, primary_key_columns)
+    
+    if data_rows:
+        # Strip out _IS_SCHEMA_ONLY and handle ID conflict
+        for r in data_rows:
+            r.pop("_IS_SCHEMA_ONLY", None)
+            if "ID" in r:
+                r["original_id"] = r.pop("ID")
+            if "id" in r:
+                r["original_id"] = r.pop("id")
+            
+        insert_rows(table, data_rows, primary_key_columns)
+    else:
+        print(f"INFO: Table {table_name} ensured, but 0 data rows to insert from {filepath}.")
+        
+
     print(f"OK: {filepath} -> {table_name} ({len(rows)} rows)")
     return table_name

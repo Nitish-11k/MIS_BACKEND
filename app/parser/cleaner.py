@@ -32,6 +32,16 @@ BOILERPLATE_KEYWORDS = [
     "BRANCH NAME",
     "PAGE-NO: ",
     "PAGE NO",
+    "PRODUCT CODE",
+    "PRODUCT NAME",
+    "CHECKER ID",
+    "TELLER NAME",
+    "REPORT ID",
+    "MAKER ID",
+    "CHECKED (SAY)",
+    "ABSTRACT(YES)",
+    "FOR APPARENT ERRORS",
+    "HECKED BY :"
 ]
 
 

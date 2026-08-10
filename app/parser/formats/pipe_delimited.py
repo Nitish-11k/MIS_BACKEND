@@ -9,8 +9,9 @@ def clean_col_name(name):
 
 def parse(raw_lines):
     metadata = extract_metadata(raw_lines)
-    cleaned = cleaned_lines(raw_lines)
-    no_boiler = remove_boilerplate_lines(cleaned)
+    # Don't use cleaned_lines because it strips the "|" characters we need!
+    lines = [l.rstrip('\n\r') for l in raw_lines]
+    no_boiler = remove_boilerplate_lines(lines)
     table_name = extract_table_name(no_boiler)
 
     header_lines = []
@@ -52,6 +53,11 @@ def parse(raw_lines):
         cells = [c.strip() for c in line.split("|")]
         cells = [c for c in cells if c != "" or True]
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        
+        # Skip repeated header lines from pagination
+        if cells and columns and clean_col_name(cells[0]) == columns[0]:
+            continue
+            
         row = {}
         for i, col_name in enumerate(columns):
             row[col_name] = cells[i] if i < len(cells) else ""
@@ -61,4 +67,4 @@ def parse(raw_lines):
         row["BRANCH_NAME"] = metadata["BRANCH_NAME"]
         row["PROC_DATE"] = metadata["PROC_DATE"]
     
-    return table_name, rows
+    return rows
