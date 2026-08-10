@@ -551,6 +551,127 @@ def get_least_transactions(branch_code: str = "ALL"):
 # ==========================================
 # 13. Dynamic Report Explorer
 # ==========================================
+@app.get("/api/loan-npa-summary")
+def get_loan_npa_summary(branch_code: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    where_clause = ""
+    params = []
+    if branch_code != "ALL":
+        where_clause = "WHERE BRANCH_CODE = ?"
+        params = [branch_code]
+        
+    try:
+        cursor.execute(f"SELECT SUM(TRY_CAST(DR_BALANCE AS FLOAT)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET {where_clause}", params)
+        total_loans = cursor.fetchone()[0] or 0
+    except:
+        total_loans = 0
+        
+    try:
+        cursor.execute(f"SELECT SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) FROM NPA_STMT {where_clause}", params)
+        total_npa_outstanding = cursor.fetchone()[0] or 0
+    except:
+        total_npa_outstanding = 0
+        
+    try:
+        cursor.execute(f"SELECT SUM(TRY_CAST(INCA AS FLOAT)) FROM NPA_STMT {where_clause}", params)
+        npa_covered = cursor.fetchone()[0] or 0
+    except:
+        npa_covered = 0
+        
+    conn.close()
+    
+    return {
+        "total_loans": abs(total_loans),
+        "total_npa": abs(total_npa_outstanding),
+        "npa_covered": abs(npa_covered)
+    }
+
+@app.get("/api/npa-branch-wise")
+def get_npa_branch_wise():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT TOP 10 
+                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = n.BRANCH_CODE), n.BRANCH_CODE) as BRANCH_NAME,
+                SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa, 
+                SUM(TRY_CAST(INCA AS FLOAT)) as covered
+            FROM NPA_STMT n
+            WHERE n.BRANCH_CODE IS NOT NULL AND n.BRANCH_CODE != ''
+            GROUP BY n.BRANCH_CODE
+            ORDER BY npa DESC
+        """)
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "NPA": abs(r[1] or 0), "Covered": abs(r[2] or 0)} for r in rows]
+    except Exception as e:
+        print(f"Error in NPA: {e}")
+        data = []
+    conn.close()
+    return data
+
+@app.get("/api/loan-branch-wise")
+def get_loan_branch_wise():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT TOP 15 BRANCH_NAME, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as loans
+            FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
+            GROUP BY BRANCH_NAME
+            ORDER BY loans DESC
+        """)
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:10] if r[0] else "Unknown", "Loans": abs(r[1] or 0)} for r in rows]
+    except:
+        data = []
+    conn.close()
+    return data
+
+@app.get("/api/loan-type-distribution")
+def get_loan_type_distribution(branch_code: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    where_clause = ""
+    params = []
+    if branch_code != "ALL":
+        where_clause = "WHERE BRANCH_CODE = ?"
+        params = [branch_code]
+    try:
+        cursor.execute(f"""
+            SELECT TOP 10 PRODUCT_NAME, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as amount
+            FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
+            {where_clause}
+            GROUP BY PRODUCT_NAME
+            ORDER BY amount DESC
+        """, params)
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:30] if r[0] else "Unknown", "raw_name": r[0] if r[0] else "Unknown", "value": abs(r[1] or 0)} for r in rows]
+    except:
+        data = []
+    conn.close()
+    return data
+
+@app.get("/api/loan-type-branches")
+def get_loan_type_branches(product_name: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT TOP 10 BRANCH_NAME, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as amount
+            FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
+            WHERE PRODUCT_NAME = ?
+            GROUP BY BRANCH_NAME
+            ORDER BY amount DESC
+        """, [product_name])
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": abs(r[1] or 0)} for r in rows]
+    except:
+        data = []
+    conn.close()
+    return data
+
 @app.get("/api/reports")
 def get_reports():
     conn = get_db_connection()

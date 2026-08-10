@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, FileText, Settings, Calendar, Settings2, MapPin } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import DynamicReportView from './DynamicReportView';
+
+const formatAmount = (num) => {
+  if (!num) return '0';
+  if (num >= 10000000) return `₹ ${(num / 10000000).toFixed(2)} Cr`;
+  if (num >= 100000) return `₹ ${(num / 100000).toFixed(2)} L`;
+  if (num >= 1000) return `₹ ${(num / 1000).toFixed(2)} K`;
+  return `₹ ${num.toFixed(2)}`;
+};
 
 const LazyReport = ({ tableName, label, selectedBranch }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -45,8 +53,17 @@ const Dashboard = () => {
   const [topBranches, setTopBranches] = useState([]);
   const [branches, setBranches] = useState([]);
   const [reports, setReports] = useState([]);
+  const [loanNpaSummary, setLoanNpaSummary] = useState(null);
+  const [npaBranchData, setNpaBranchData] = useState([]);
+  const [loanBranchData, setLoanBranchData] = useState([]);
+  const [loanTypeData, setLoanTypeData] = useState([]);
+  const [selectedLoanType, setSelectedLoanType] = useState(null);
+  const [loanTypeBranches, setLoanTypeBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [loading, setLoading] = useState(true);
+
+  // Vibrant, accessible color palette for the Pie Chart
+  const COLORS = ['#2563EB', '#F97316', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F59E0B', '#3B82F6', '#EF4444', '#6366F1'];
 
   useEffect(() => {
     setLoading(true);
@@ -55,16 +72,48 @@ const Dashboard = () => {
       .then(data => { setTopBranches(data); setLoading(false); })
       .catch(() => setLoading(false));
 
-    fetch('http://localhost:8000/api/reports')
-      .then(res => res.json())
-      .then(data => { setReports(Array.isArray(data) ? data : []); })
-      .catch(console.error);
-      
     fetch('http://localhost:8000/api/branches')
       .then(res => res.json())
       .then(data => { setBranches(Array.isArray(data) ? data : []); })
       .catch(console.error);
+
+    fetch('http://localhost:8000/api/npa-branch-wise')
+      .then(res => res.json())
+      .then(data => { setNpaBranchData(data); })
+      .catch(console.error);
+
+    fetch('http://localhost:8000/api/loan-branch-wise')
+      .then(res => res.json())
+      .then(data => { setLoanBranchData(data); })
+      .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    fetch(`http://localhost:8000/api/loan-npa-summary?branch_code=${selectedBranch}`)
+      .then(res => res.json())
+      .then(data => { setLoanNpaSummary(data); })
+      .catch(console.error);
+  }, [selectedBranch]);
+
+  useEffect(() => {
+    fetch(`http://localhost:8000/api/loan-type-distribution?branch_code=${selectedBranch}`)
+      .then(res => res.json())
+      .then(data => { 
+        // Normalize values to Lakhs to prevent Recharts SVG precision errors with huge numbers
+        const normalized = data.map(d => ({ ...d, rawValue: d.value, value: d.value / 100000 }));
+        setLoanTypeData(normalized); 
+      })
+      .catch(console.error);
+  }, [selectedBranch]);
+
+  useEffect(() => {
+    if (selectedLoanType) {
+      fetch(`http://localhost:8000/api/loan-type-branches?product_name=${encodeURIComponent(selectedLoanType)}`)
+        .then(res => res.json())
+        .then(data => setLoanTypeBranches(data))
+        .catch(console.error);
+    }
+  }, [selectedLoanType]);
 
   // Prepare data for the matrix
   const top10 = [...topBranches].sort((a, b) => b.deposits - a.deposits).slice(0, 10);
@@ -310,15 +359,163 @@ const Dashboard = () => {
 
           </div>
 
-          {/* Detailed Reports Section */}
+          {/* Detailed Reports Section replaced by Specific KPI Requirements */}
           <div style={{ marginTop: '40px' }}>
             <div style={{ paddingBottom: '16px', marginBottom: '24px', borderBottom: '2px solid #E2E8F0' }}>
-              <h2 style={{ fontSize: '20px', color: '#0B1F3A', margin: 0 }}>Detailed File Analysis</h2>
-              <div className="subtitle" style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>Scroll down to load individual MIS file reports</div>
+              <h2 style={{ fontSize: '20px', color: '#0B1F3A', margin: 0 }}>Loan & NPA Status</h2>
+              <div className="subtitle" style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+                Key metrics for Loans and Non-Performing Assets
+              </div>
             </div>
-            {reports.map((report, index) => (
-              <LazyReport key={index} tableName={report.name} label={report.label} selectedBranch={selectedBranch} />
-            ))}
+            
+            {loanNpaSummary && (
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                <div className="card" style={{ flex: 1, minWidth: '250px', padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: 'rgba(127,179,232,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7FB3E8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Loan Amount</div>
+                    <div style={{ fontSize: '28px', color: '#0B1F3A', fontWeight: '700' }}>{formatAmount(loanNpaSummary.total_loans)}</div>
+                  </div>
+                </div>
+                
+                <div className="card" style={{ flex: 1, minWidth: '250px', padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: 'rgba(232,115,44,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8732C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total NPA Outstanding</div>
+                    <div style={{ fontSize: '28px', color: '#E8732C', fontWeight: '700' }}>{formatAmount(loanNpaSummary.total_npa)}</div>
+                  </div>
+                </div>
+
+                <div className="card" style={{ flex: 1, minWidth: '250px', padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total NPA Covered</div>
+                    <div style={{ fontSize: '28px', color: '#22C55E', fontWeight: '700' }}>{formatAmount(loanNpaSummary.npa_covered)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* New Charts Section */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginTop: '24px' }}>
+              
+              {/* NPA Area Chart */}
+              <div className="card" style={{ padding: '24px' }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B1F3A', marginBottom: '20px' }}>Top 10 Branches by NPA</div>
+                <div style={{ height: '350px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={[...npaBranchData].sort((a,b) => b.NPA - a.NPA).slice(0, 10)} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+                      <defs>
+                        <linearGradient id="colorNPA" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#E8732C" stopOpacity={0.6}/>
+                          <stop offset="95%" stopColor="#E8732C" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorCovered" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#22C55E" stopOpacity={0.6}/>
+                          <stop offset="95%" stopColor="#22C55E" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} angle={-45} textAnchor="end" height={60} tick={{ fontSize: 10, fill: '#6B7280' }} />
+                      <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${(val/100000).toFixed(0)}L`} tick={{ fontSize: 10, fill: '#6B7280' }} width={50} />
+                      <Tooltip formatter={(value) => formatAmount(value)} />
+                      <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '10px' }} />
+                      <Area type="monotone" dataKey="NPA" stroke="#E8732C" fillOpacity={1} fill="url(#colorNPA)" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Area type="monotone" dataKey="Covered" stroke="#22C55E" fillOpacity={1} fill="url(#colorCovered)" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Loan Balance Branch Wise */}
+              <div className="card" style={{ padding: '24px' }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B1F3A', marginBottom: '20px' }}>Top 10 Branches by Loan Balance</div>
+                <div style={{ height: '350px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[...loanBranchData].sort((a,b) => b.Loans - a.Loans).slice(0, 10)} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} angle={-45} textAnchor="end" height={60} tick={{ fontSize: 10, fill: '#6B7280' }} />
+                      <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${(val/100000).toFixed(0)}L`} tick={{ fontSize: 10, fill: '#6B7280' }} width={50} />
+                      <Tooltip formatter={(value) => formatAmount(value)} cursor={{ fill: '#f8fafc' }} />
+                      <Bar dataKey="Loans" fill="#2563EB" radius={[4, 4, 0, 0]} barSize={24} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Loan Type Distribution Pie Chart */}
+              <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', borderRadius: '12px' }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B1F3A', marginBottom: '20px' }}>Top Loan Types Distribution</div>
+                <div style={{ height: '350px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={loanTypeData.slice(0, 6)}
+                        cx="50%"
+                        cy="45%"
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="value"
+                        nameKey="name"
+                        isAnimationActive={false}
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {loanTypeData.slice(0, 6).map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={COLORS[index % COLORS.length]} 
+                            onClick={() => setSelectedLoanType(entry.raw_name)}
+                            style={{ cursor: 'pointer', outline: 'none' }}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(val, name, props) => formatAmount(props.payload.rawValue)} />
+                      <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '11px', fontWeight: '500', color: '#4B5563', paddingTop: '15px' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '11px', color: '#6B7280' }}>
+                  (Click any slice to see top branches)
+                </div>
+              </div>
+
+              {/* Drill-down Bar Chart */}
+              {selectedLoanType && (
+                <div className="card" style={{ padding: '24px', gridColumn: '1 / -1', border: '1px solid #E5E7EB' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B1F3A' }}>
+                      Top Branches for: <span style={{ color: '#2563EB' }}>{selectedLoanType}</span>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedLoanType(null)}
+                      style={{ padding: '4px 12px', fontSize: '12px', background: '#F3F4F6', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '500' }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={loanTypeBranches} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} angle={-45} textAnchor="end" height={60} tick={{ fontSize: 10, fill: '#6B7280' }} />
+                        <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${(val/100000).toFixed(0)}L`} tick={{ fontSize: 10, fill: '#6B7280' }} width={50} />
+                        <Tooltip formatter={(value) => formatAmount(value)} cursor={{ fill: '#f8fafc' }} />
+                        <Bar dataKey="value" fill="#10B981" radius={[4, 4, 0, 0]} barSize={30} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
           </div>
         </div>
       </div>
