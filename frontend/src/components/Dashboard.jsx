@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, FileText, Settings, Calendar, Settings2, MapPin } from 'lucide-react';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, PieChart, Pie, Cell, ComposedChart, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import DynamicReportView from './DynamicReportView';
 
 const formatAmount = (num) => {
@@ -60,82 +60,81 @@ const Dashboard = () => {
   const [selectedLoanType, setSelectedLoanType] = useState(null);
   const [loanTypeBranches, setLoanTypeBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('ALL');
+  const [selectedPeriod, setSelectedPeriod] = useState('ALL');
+  const [kpiData, setKpiData] = useState({ total_deposits: 0, total_loans: 0, total_npa: 0, branches_reporting: 0 });
   const [loading, setLoading] = useState(true);
+  const [activeModal, setActiveModal] = useState(null);
+  const [modalData, setModalData] = useState([]);
 
   // Vibrant, accessible color palette for the Pie Chart
   const COLORS = ['#2563EB', '#F97316', '#10B981', '#8B5CF6', '#EC4899', '#14B8A6', '#F59E0B', '#3B82F6', '#EF4444', '#6366F1'];
 
   useEffect(() => {
-    setLoading(true);
-    fetch('http://localhost:8000/api/branch-comparison')
-      .then(res => res.json())
-      .then(data => { setTopBranches(data); setLoading(false); })
-      .catch(() => setLoading(false));
-
     fetch('http://localhost:8000/api/branches')
       .then(res => res.json())
       .then(data => { setBranches(Array.isArray(data) ? data : []); })
       .catch(console.error);
-
-    fetch('http://localhost:8000/api/npa-branch-wise')
-      .then(res => res.json())
-      .then(data => { setNpaBranchData(data); })
-      .catch(console.error);
-
-    fetch('http://localhost:8000/api/loan-branch-wise')
-      .then(res => res.json())
-      .then(data => { setLoanBranchData(data); })
-      .catch(console.error);
   }, []);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/loan-npa-summary?branch_code=${selectedBranch}`)
-      .then(res => res.json())
-      .then(data => { setLoanNpaSummary(data); })
-      .catch(console.error);
-  }, [selectedBranch]);
-
-  useEffect(() => {
-    fetch(`http://localhost:8000/api/loan-type-distribution?branch_code=${selectedBranch}`)
-      .then(res => res.json())
-      .then(data => { 
-        // Normalize values to Lakhs to prevent Recharts SVG precision errors with huge numbers
-        const normalized = data.map(d => ({ ...d, rawValue: d.value, value: d.value / 100000 }));
-        setLoanTypeData(normalized); 
-      })
-      .catch(console.error);
-  }, [selectedBranch]);
+    setLoading(true);
+    
+    Promise.all([
+      fetch(`http://localhost:8000/api/branch-comparison?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/loan-branch-wise?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/kpi-summary?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/loan-npa-summary?branch_code=${selectedBranch}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/loan-type-distribution?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json())
+    ]).then(([compData, npaData, loanBranchData, kpiSummary, loanNpaSum, typeDistData]) => {
+      setTopBranches(compData);
+      setNpaBranchData(npaData);
+      setLoanBranchData(loanBranchData);
+      setKpiData(kpiSummary);
+      setLoanNpaSummary(loanNpaSum);
+      
+      const normalized = typeDistData.map(d => ({ ...d, rawValue: d.value, value: d.value / 100000 }));
+      setLoanTypeData(normalized);
+      
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
+    });
+  }, [selectedBranch, selectedPeriod]);
 
   useEffect(() => {
     if (selectedLoanType) {
-      fetch(`http://localhost:8000/api/loan-type-branches?product_name=${encodeURIComponent(selectedLoanType)}`)
+      fetch(`http://localhost:8000/api/loan-type-branches?product_name=${encodeURIComponent(selectedLoanType)}&branch_code=${selectedBranch}&period=${selectedPeriod}`)
         .then(res => res.json())
         .then(data => setLoanTypeBranches(data))
         .catch(console.error);
     }
-  }, [selectedLoanType]);
+  }, [selectedLoanType, selectedBranch, selectedPeriod]);
 
-  // Prepare data for the matrix
-  const top10 = [...topBranches].sort((a, b) => b.deposits - a.deposits).slice(0, 10);
-  
-  // Aggregate stats
-  const totalDeposits = topBranches.reduce((acc, curr) => acc + curr.deposits, 0);
-  const totalLoans = topBranches.reduce((acc, curr) => acc + curr.loans, 0);
 
-  // Mock trend data for line chart
-  const lineData = [
-    { name: 'Jan', deposits: 135, loans: 140 },
-    { name: 'Feb', deposits: 43, loans: 170 },
-    { name: 'Mar', deposits: 111, loans: 103 },
-    { name: 'Apr', deposits: 92, loans: 96 },
-    { name: 'May', deposits: 103, loans: 103 },
-    { name: 'Jun', deposits: 100, loans: 140 },
-    { name: 'Jul', deposits: 111, loans: 144 },
-    { name: 'Aug', deposits: 76, loans: 117 },
-    { name: 'Sep', deposits: 84, loans: 84 },
-    { name: 'Oct', deposits: 44, loans: 68 },
-    { name: 'Nov', deposits: 5, loans: 5 },
-  ];
+
+  useEffect(() => {
+    if (activeModal) {
+      setModalData([]);
+      const endpoint = activeModal === 'deposits' ? 'deposit-branch-wise' 
+                     : activeModal === 'loans' ? 'loan-branch-wise' 
+                     : 'npa-branch-wise';
+                     
+      fetch(`http://localhost:8000/api/${endpoint}?branch_code=${selectedBranch}&period=${selectedPeriod}`)
+        .then(res => res.json())
+          .then(data => {
+            if (activeModal === 'npa') {
+                setModalData(data.map(d => ({ name: d.name, value: (d.NPA || 0) / 100000, rawValue: d.NPA || 0 })));
+            } else if (activeModal === 'loans') {
+                setModalData(data.map(d => ({ name: d.name, value: (d.Loans || 0) / 100000, rawValue: d.Loans || 0 })));
+            } else {
+                setModalData(data.map(d => ({ name: d.name, value: (d.value || 0) / 100000, rawValue: d.value || 0 })));
+            }
+          })
+        .catch(console.error);
+    }
+  }, [activeModal, selectedPeriod]);
 
   return (
     <div className="app-container">
@@ -160,204 +159,84 @@ const Dashboard = () => {
 
       <div className="main-content">
         {/* Header */}
-        <div className="dashboard-header">
+        <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div className="header-title-section">
-            <h1>Banking Dashboard</h1>
-            <div className="subtitle">REPORT UPDATED ON: 10/8/2026 3:21:23 PM</div>
+            <h1 className="header-title" style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>Banking MIS Dashboard</h1>
+            <p className="header-subtitle" style={{ margin: '0', color: '#6B7280' }}>Performance & Operations Overview</p>
           </div>
-          <div className="header-filters" style={{ flexDirection: 'row', alignItems: 'center', gap: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <MapPin size={18} color="#6B7280" />
-              <span className="showing-data">Showing data for:</span>
+          
+          <div className="header-controls" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            {/* Period Dropdown */}
+            <div className="branch-selector-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', padding: '8px 12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <Calendar size={18} color="#6B7280" />
               <select 
-                value={selectedBranch} 
-                onChange={(e) => setSelectedBranch(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #E2E8F0', outline: 'none', fontWeight: '600', color: '#0B1F3A', minWidth: '200px' }}
+                className="branch-selector" 
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '600', color: '#0B1F3A', cursor: 'pointer' }}
               >
-                <option value="ALL">All Branches (Bank-wide)</option>
+                <option value="ALL">All Time</option>
+                <option value="7D">Last 7 Days</option>
+                <option value="30D">Last 30 Days</option>
+                <option value="6M">Last 6 Months</option>
+              </select>
+            </div>
+
+            {/* Branch Dropdown */}
+            <div className="branch-selector-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', padding: '8px 12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <MapPin size={18} color="#6B7280" />
+              <select 
+                className="branch-selector" 
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '600', color: '#0B1F3A', minWidth: '150px', cursor: 'pointer' }}
+              >
+                <option value="ALL">All Branches</option>
                 {branches.map((b, i) => (
                   <option key={i} value={b.code}>{b.code} - {b.name}</option>
                 ))}
               </select>
             </div>
-            <div className="date-picker">
-              <Calendar size={20} /> 01 Jan, 2025 - 07 Nov, 2026
-            </div>
           </div>
         </div>
 
         <div className="dashboard-content">
-          {/* Top Row Grid */}
-          <div className="top-row-grid">
-            {/* Left Panel */}
-            <div className="panel">
-              <div className="flush-kpi-row">
-                <div className="flush-kpi-block light-blue">
-                  <div className="kpi-block-value">{(totalDeposits / 1000).toFixed(1)}K</div>
-                  <div className="kpi-block-label">Net Deposits</div>
-                </div>
-                <div className="flush-kpi-block navy">
-                  <div className="kpi-block-value">{totalDeposits.toLocaleString()}</div>
-                  <div className="kpi-block-label">Deposit Count</div>
-                </div>
-                <div className="flush-kpi-block orange">
-                  <div className="kpi-block-value">{totalLoans.toLocaleString()}</div>
-                  <div className="kpi-block-label">Loan Count</div>
-                </div>
+          {/* Top Stat Cards */}
+          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+            <div className="card" onClick={() => { if (selectedBranch === 'ALL') setActiveModal('deposits') }} style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>Total Deposits</span>
+                <div style={{ background: '#E0F2FE', color: '#0284C7', padding: '8px', borderRadius: '8px' }}><FileText size={20} /></div>
               </div>
-              <div className="panel-title">
-                <h3>Deposits vs Loans</h3>
-                <div className="subtitle">by Month & Year</div>
-              </div>
-              <div style={{ width: '100%', height: '250px', padding: '16px' }}>
-                <ResponsiveContainer>
-                  <LineChart data={lineData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                    <XAxis dataKey="name" tick={{fontSize: 10}} axisLine={false} tickLine={false} />
-                    <Tooltip />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                    <Line type="monotone" dataKey="deposits" name="Net Deposits" stroke="#7FB3E8" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="loans" name="Loans" stroke="#E8732C" strokeWidth={2} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{formatAmount(kpiData?.total_deposits || 0)}</div>
             </div>
 
-            {/* Right Panel */}
-            <div className="panel">
-              <div className="panel-title" style={{ paddingBottom: '16px' }}>
-                <h3>Performance Matrix</h3>
-                <div className="subtitle">by Month and Branch</div>
+            <div className="card" onClick={() => { if (selectedBranch === 'ALL') setActiveModal('loans') }} style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>Total Loans</span>
+                <div style={{ background: '#FEF3C7', color: '#D97706', padding: '8px', borderRadius: '8px' }}><FileText size={20} /></div>
               </div>
-              <table className="data-table-hr">
-                <thead>
-                  <tr>
-                    <th>Branch</th>
-                    <th style={{textAlign: 'center'}}>Start</th>
-                    <th>Trend</th>
-                    <th style={{textAlign: 'center'}}>Now</th>
-                    <th style={{textAlign: 'right'}}>% Change</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {top10.slice(0, 7).map((b, i) => {
-                    const start = Math.floor(b.deposits * (0.8 + Math.random() * 0.4));
-                    const change = ((b.deposits - start) / start) * 100;
-                    return (
-                      <tr key={i}>
-                        <td style={{ color: '#6B7280' }}>{b.name.substring(0, 10)}</td>
-                        <td style={{ textAlign: 'center', backgroundColor: '#E2E8F0', fontWeight: '600' }}>{start}</td>
-                        <td>
-                          <svg width="60" height="20">
-                            <polyline points="0,10 20,5 40,15 60,10" fill="none" stroke="#6B7280" strokeWidth="1" />
-                          </svg>
-                        </td>
-                        <td style={{ textAlign: 'center', backgroundColor: '#E2E8F0', fontWeight: '600' }}>{b.deposits}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          <span className={`pct-cell ${change >= 0 ? 'pct-positive' : 'pct-negative'}`}>
-                            {change >= 0 ? '+' : ''}{change.toFixed(0)}%
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  <tr>
-                    <td style={{ fontWeight: '700', color: '#0B1F3A' }}>Total</td>
-                    <td style={{ textAlign: 'center', fontWeight: '700' }}>420</td>
-                    <td></td>
-                    <td style={{ textAlign: 'center', fontWeight: '700' }}>407</td>
-                    <td style={{ textAlign: 'right', fontWeight: '700' }}>-3%</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{formatAmount(kpiData?.total_loans || 0)}</div>
+            </div>
+
+            <div className="card" onClick={() => { if (selectedBranch === 'ALL') setActiveModal('npa') }} style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>Total NPA</span>
+                <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '8px', borderRadius: '8px' }}><FileText size={20} /></div>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{formatAmount(kpiData?.total_npa || 0)}</div>
+            </div>
+
+            <div className="card" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>Branches Reporting</span>
+                <div style={{ background: '#D1FAE5', color: '#059669', padding: '8px', borderRadius: '8px' }}><LayoutDashboard size={20} /></div>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{kpiData?.branches_reporting || 0}</div>
             </div>
           </div>
 
-          {/* Bottom Row Grid */}
-          <div className="bottom-row-grid">
-            {/* Panel 1 */}
-            <div className="panel">
-              <div className="flush-kpi-row">
-                <div className="flush-kpi-block navy" style={{ padding: '8px' }}>
-                  <div className="kpi-block-value" style={{ fontSize: '18px' }}>11.02%</div>
-                  <div className="kpi-block-label">% Debit Txns</div>
-                </div>
-                <div className="flush-kpi-block orange" style={{ padding: '8px' }}>
-                  <div className="kpi-block-value" style={{ fontSize: '18px' }}>4.53%</div>
-                  <div className="kpi-block-label">% Credit Txns</div>
-                </div>
-              </div>
-              <div className="panel-title">
-                <h3>Transaction Mix</h3>
-                <div className="subtitle">by Branch</div>
-              </div>
-              <div className="h-bar-container">
-                {top10.slice(0, 5).map((b, i) => (
-                  <div className="h-bar-row" key={i}>
-                    <div className="h-bar-label">{b.name.substring(0,4)}</div>
-                    <div className="h-bar-track">
-                      <div className="h-bar-fill-navy" style={{ width: (Math.random() * 80 + 10) + '%' }}></div>
-                      <div className="h-bar-fill-orange" style={{ width: (Math.random() * 40 + 5) + '%' }}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Panel 2 */}
-            <div className="panel">
-              <div className="flush-kpi-row">
-                <div className="flush-kpi-block navy" style={{ padding: '8px' }}>
-                  <div className="kpi-block-value" style={{ fontSize: '18px' }}>3.8%</div>
-                  <div className="kpi-block-label">% NPA Active</div>
-                </div>
-              </div>
-              <div className="panel-title">
-                <h3>NPA %</h3>
-                <div className="subtitle">by Branch</div>
-              </div>
-              <div className="h-bar-container">
-                {top10.slice(0, 5).map((b, i) => (
-                  <div className="h-bar-row" key={i}>
-                    <div className="h-bar-label">{b.name.substring(0,4)}</div>
-                    <div className="h-bar-track">
-                      <div className="h-bar-fill-navy" style={{ width: (Math.random() * 60 + 10) + '%' }}></div>
-                    </div>
-                    <span style={{ fontSize: '10px', fontWeight: '600' }}>{(Math.random() * 10).toFixed(1)}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Panel 3 */}
-            <div className="panel">
-              <div className="flush-kpi-row">
-                <div className="flush-kpi-block navy" style={{ padding: '8px' }}>
-                  <div className="kpi-block-value" style={{ fontSize: '18px' }}>92.09K</div>
-                  <div className="kpi-block-label">Avg Balance</div>
-                </div>
-                <div className="flush-kpi-block orange" style={{ padding: '8px' }}>
-                  <div className="kpi-block-value" style={{ fontSize: '18px' }}>$0.15</div>
-                  <div className="kpi-block-label">Cost/Per/Day</div>
-                </div>
-              </div>
-              <div className="panel-title">
-                <h3>Avg Balance/Cost</h3>
-                <div className="subtitle">by Branch</div>
-              </div>
-              <div className="h-bar-container">
-                {top10.slice(0, 5).map((b, i) => (
-                  <div className="h-bar-row" key={i}>
-                    <div className="h-bar-label">{b.name.substring(0,4)}</div>
-                    <div className="h-bar-track">
-                      <div className="h-bar-fill-orange" style={{ width: (Math.random() * 80 + 10) + '%' }}></div>
-                    </div>
-                    <span style={{ fontSize: '10px', fontWeight: '600' }}>${(Math.random()).toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
 
           {/* Detailed Reports Section replaced by Specific KPI Requirements */}
           <div style={{ marginTop: '40px' }}>
@@ -404,7 +283,6 @@ const Dashboard = () => {
 
             {/* New Charts Section */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginTop: '24px' }}>
-              
               {/* NPA Area Chart */}
               <div className="card" style={{ padding: '24px' }}>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B1F3A', marginBottom: '20px' }}>Top 10 Branches by NPA</div>
@@ -421,7 +299,6 @@ const Dashboard = () => {
                           <stop offset="95%" stopColor="#22C55E" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} angle={-45} textAnchor="end" height={60} tick={{ fontSize: 10, fill: '#6B7280' }} />
                       <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${(val/100000).toFixed(0)}L`} tick={{ fontSize: 10, fill: '#6B7280' }} width={50} />
                       <Tooltip formatter={(value) => formatAmount(value)} />
@@ -439,7 +316,6 @@ const Dashboard = () => {
                 <div style={{ height: '350px' }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={[...loanBranchData].sort((a,b) => b.Loans - a.Loans).slice(0, 10)} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} angle={-45} textAnchor="end" height={60} tick={{ fontSize: 10, fill: '#6B7280' }} />
                       <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${(val/100000).toFixed(0)}L`} tick={{ fontSize: 10, fill: '#6B7280' }} width={50} />
                       <Tooltip formatter={(value) => formatAmount(value)} cursor={{ fill: '#f8fafc' }} />
@@ -471,8 +347,8 @@ const Dashboard = () => {
                           <Cell 
                             key={`cell-${index}`} 
                             fill={COLORS[index % COLORS.length]} 
-                            onClick={() => setSelectedLoanType(entry.raw_name)}
-                            style={{ cursor: 'pointer', outline: 'none' }}
+                            onClick={() => { if (selectedBranch === 'ALL') setSelectedLoanType(entry.raw_name || entry.name) }}
+                            style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default', outline: 'none' }}
                           />
                         ))}
                       </Pie>
@@ -481,9 +357,11 @@ const Dashboard = () => {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '11px', color: '#6B7280' }}>
-                  (Click any slice to see top branches)
-                </div>
+                {selectedBranch === 'ALL' && (
+                  <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '11px', color: '#6B7280' }}>
+                    (Click any slice to see top branches)
+                  </div>
+                )}
               </div>
 
               {/* Drill-down Bar Chart */}
@@ -499,18 +377,52 @@ const Dashboard = () => {
                     >
                       Close
                     </button>
-                  </div>
-                  <div style={{ height: '300px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={loanTypeBranches} margin={{ top: 10, right: 30, left: 0, bottom: 40 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} angle={-45} textAnchor="end" height={60} tick={{ fontSize: 10, fill: '#6B7280' }} />
-                        <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${(val/100000).toFixed(0)}L`} tick={{ fontSize: 10, fill: '#6B7280' }} width={50} />
-                        <Tooltip formatter={(value) => formatAmount(value)} cursor={{ fill: '#f8fafc' }} />
-                        <Bar dataKey="value" fill="#10B981" radius={[4, 4, 0, 0]} barSize={30} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                               <div style={{ height: '550px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ height: '220px', flexShrink: 0 }}>
+                      <div style={{ height: '100%', background: '#F8FAFC', borderRadius: '8px', padding: '16px', border: '1px solid #E5E7EB' }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#475569', fontWeight: '600' }}>Top 10 Branches</h3>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[...loanTypeBranches].sort((a,b) => b.value - a.value).slice(0, 8)}>
+                            <PolarGrid stroke="#E5E7EB" />
+                            <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 11, fontWeight: 500 }} />
+                            <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                            <Radar name="Amount" dataKey="value" stroke="#10B981" fill="#10B981" fillOpacity={0.5} />
+                            <Tooltip formatter={(val, name, props) => [formatAmount(props.payload.value), 'Amount']} />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid #E5E7EB', borderRadius: '8px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: '#F8FAFC', zIndex: 1, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
+                          <tr>
+                            <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', width: '50px' }}>#</th>
+                            <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB' }}>Branch Name</th>
+                            <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', textAlign: 'right', width: '150px' }}>Amount</th>
+                            <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', width: '150px' }}>Visual</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {loanTypeBranches.map((row, index) => {
+                            const maxVal = Math.max(...loanTypeBranches.map(d => d.value));
+                            const percent = maxVal === 0 ? 0 : (row.value / maxVal) * 100;
+                            return (
+                              <tr key={index} style={{ borderBottom: '1px solid #F1F5F9', background: index % 2 === 0 ? '#FFFFFF' : '#F8FAFC' }}>
+                                <td style={{ padding: '12px 16px', fontSize: '14px', color: '#64748B' }}>{index + 1}</td>
+                                <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '500', color: '#0F172A' }}>{row.name}</td>
+                                <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#0F172A', textAlign: 'right' }}>{formatAmount(row.value)}</td>
+                                <td style={{ padding: '12px 16px' }}>
+                                  <div style={{ width: '100%', height: '8px', background: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${percent}%`, height: '100%', background: '#10B981', borderRadius: '4px' }}></div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>        </div>
                 </div>
               )}
 
@@ -519,6 +431,72 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* KPI Drilldown Modal */}
+      {activeModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '80%', maxWidth: '900px', height: '500px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', color: '#0F172A', fontWeight: '600' }}>
+                Top Branches by {activeModal === 'deposits' ? 'Deposits' : activeModal === 'loans' ? 'Loans' : 'NPA'}
+              </h2>
+              <button onClick={() => setActiveModal(null)} style={{ padding: '8px 16px', background: '#F1F5F9', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', color: '#475569' }}>Close</button>
+            </div>
+            
+            {modalData.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280' }}>Loading data...</div>
+            ) : (
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ height: '220px', flexShrink: 0 }}>
+                  <div style={{ height: '100%', background: '#F8FAFC', borderRadius: '8px', padding: '16px', border: '1px solid #E5E7EB' }}>
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#475569', fontWeight: '600' }}>Top 10 Branches</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[...modalData].sort((a,b) => b.value - a.value).slice(0, 8)}>
+                        <PolarGrid stroke="#E5E7EB" />
+                        <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 11, fontWeight: 500 }} />
+                        <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                        <Radar name="Amount" dataKey="value" stroke={activeModal === 'deposits' ? '#38BDF8' : activeModal === 'loans' ? '#FBBF24' : '#F87171'} fill={activeModal === 'deposits' ? '#38BDF8' : activeModal === 'loans' ? '#FBBF24' : '#F87171'} fillOpacity={0.5} />
+                        <Tooltip formatter={(val, name, props) => [formatAmount(props.payload.rawValue), 'Amount']} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid #E5E7EB', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#F8FAFC', zIndex: 1, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
+                      <tr>
+                        <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', width: '50px' }}>#</th>
+                        <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB' }}>Branch Name</th>
+                        <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', textAlign: 'right', width: '150px' }}>Amount</th>
+                        <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', width: '150px' }}>Visual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modalData.map((row, index) => {
+                        const maxVal = Math.max(...modalData.map(d => d.value));
+                        const percent = maxVal === 0 ? 0 : (row.value / maxVal) * 100;
+                        const barColor = activeModal === 'deposits' ? '#38BDF8' : activeModal === 'loans' ? '#FBBF24' : '#F87171';
+                        return (
+                          <tr key={index} style={{ borderBottom: '1px solid #F1F5F9', background: index % 2 === 0 ? '#FFFFFF' : '#F8FAFC' }}>
+                            <td style={{ padding: '12px 16px', fontSize: '14px', color: '#64748B' }}>{index + 1}</td>
+                            <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '500', color: '#0F172A' }}>{row.name}</td>
+                            <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#0F172A', textAlign: 'right' }}>{formatAmount(row.rawValue)}</td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ width: '100%', height: '8px', background: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ width: `${percent}%`, height: '100%', background: barColor, borderRadius: '4px' }}></div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

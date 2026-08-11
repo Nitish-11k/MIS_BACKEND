@@ -3,8 +3,7 @@ import pyodbc
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-
-# Load env variables
+from functools import lru_cache
 load_dotenv('app/.env')
 
 app = FastAPI(title="Banking MIS API")
@@ -22,8 +21,22 @@ def get_db_connection():
     # We will use Windows Authentication as per the user's .env configuration
     server = r"DESKTOP-4QG3M53\MSSQLSERVER01"
     database = "ManualMis"
-    conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;"
+    conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;'
     return pyodbc.connect(conn_str)
+
+def get_date_filter_sql(period: str, table_name: str, prefix: str = "WHERE", date_col: str = "PROC_DATE"):
+    """Generates SQL condition for filtering by period based on the max date in the table."""
+    if period == "ALL" or not period:
+        return "", []
+    days = 0
+    if period == "7D": days = 7
+    elif period == "30D": days = 30
+    elif period == "6M": days = 180
+    else: return "", []
+    
+    # Converts DD/MM/YYYY (103) to Date for comparison against the max date available in the mock DB
+    sql = f" {prefix} CONVERT(date, {table_name}.{date_col}, 103) >= DATEADD(day, -?, (SELECT MAX(CONVERT(date, {date_col}, 103)) FROM {table_name})) "
+    return sql, [days]
 
 # ==========================================
 # 0. Branches List
@@ -51,46 +64,116 @@ def get_branches():
 # 0.5 Branch Comparison (NEW)
 # ==========================================
 @app.get("/api/branch-comparison")
-def get_branch_comparison():
+def get_branch_comparison(branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
-    # Get all branches with deposit data
-    cursor.execute("""
-        SELECT 
-            D.BRANCH_NAME, 
-            COUNT(D.ACCOUNT_NUMBER) as total_deposits
-        FROM DEPOSITS_BALANCE_FILE_DEPD0586 D
-        WHERE D.BRANCH_NAME IS NOT NULL AND D.BRANCH_NAME != ''
-        GROUP BY D.BRANCH_NAME
-        ORDER BY total_deposits DESC
-    """)
-    top_branches = cursor.fetchall()
+    # Apply date filter
+    where_sql, params = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
     
-    # Also fetch loans for these branches
-    branch_names = [row[0] for row in top_branches]
-    if not branch_names:
-        conn.close()
-        return []
+    if branch_code != "ALL":
+        where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
+        params.append(branch_code)
         
-    placeholders = ",".join(["?"] * len(branch_names))
-    cursor.execute(f"""
-        SELECT BRANCH_NAME, COUNT(*) as total_loans
-        FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
-        WHERE BRANCH_NAME IN ({placeholders})
-        GROUP BY BRANCH_NAME
-    """, branch_names)
-    loans_data = {row[0]: row[1] for row in cursor.fetchall()}
-    
+    try:
+        cursor.execute(f"""
+            SELECT TOP 10 BRANCH_NAME, SUM(TRY_CAST(BALANCE_LCY AS FLOAT)) as total_deposit 
+            FROM DEPOSITS_BALANCE_FILE_DEPD0586
+            {where_sql}
+            GROUP BY BRANCH_NAME
+            ORDER BY total_deposit DESC
+        """, params)
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "deposits": abs(r[1] or 0)} for r in rows]
+    except Exception as e:
+        print(f"Error: {e}")
+        data = []
     conn.close()
+    return data
+
+@app.get("/api/deposit-branch-wise")
+@lru_cache(maxsize=128)
+def get_deposit_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
-    data = []
-    for row in top_branches:
-        b_name = row[0][:20] if row[0] else "Unknown"
-        data.append({
-            "name": b_name,
-            "deposits": row[1],
-            "loans": loans_data.get(row[0], 0)
-        })
+    where_dep, params_dep = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
+    
+    if branch_code != "ALL":
+        where_dep += " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
+        params_dep.append(branch_code)
+        
+    try:
+        cursor.execute(f"""
+            SELECT BRANCH_NAME, SUM(TRY_CAST(CURRENT_BALANCE AS FLOAT)) as deposits
+            FROM DEPOSITS_BALANCE_FILE_DEPD0586
+            {where_dep}
+            GROUP BY BRANCH_NAME
+            ORDER BY deposits DESC
+        """, params_dep)
+        
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": abs(r[1] or 0)} for r in rows]
+    except Exception as e:
+        print(f"Error calculating branch-wise deposits: {e}")
+        data = []
+        
+    conn.close()
+    return data
+
+@app.get("/api/kpi-summary")
+@lru_cache(maxsize=128)
+def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    data = {
+        "total_deposits": 0,
+        "total_loans": 0,
+        "total_npa": 0,
+        "branches_reporting": 0
+    }
+    
+    try:
+        # Total Deposits
+        where_dep, params_dep = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
+        if branch_code != "ALL":
+            where_dep += " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
+            params_dep.append(branch_code)
+        cursor.execute(f"SELECT SUM(TRY_CAST(CURRENT_BALANCE AS FLOAT)) FROM DEPOSITS_BALANCE_FILE_DEPD0586 {where_dep}", params_dep)
+        res = cursor.fetchone()
+        if res and res[0]: data["total_deposits"] = abs(res[0])
+        
+        # Total Loans
+        where_loan, params_loan = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET")
+        if branch_code != "ALL":
+            where_loan += " AND BRANCH_CODE = ?" if "WHERE" in where_loan else " WHERE BRANCH_CODE = ?"
+            params_loan.append(branch_code)
+        cursor.execute(f"SELECT SUM(TRY_CAST(DR_BALANCE AS FLOAT)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET {where_loan}", params_loan)
+        res = cursor.fetchone()
+        if res and res[0]: data["total_loans"] = abs(res[0])
+        
+        # Total NPA
+        where_npa, params_npa = get_date_filter_sql(period, "NPA_STMT", "WHERE")
+        if branch_code != "ALL":
+            where_npa += " AND BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE BRANCH_CODE = ?"
+            params_npa.append(branch_code)
+        cursor.execute(f"SELECT SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) FROM NPA_STMT {where_npa}", params_npa)
+        res = cursor.fetchone()
+        if res and res[0]: data["total_npa"] = abs(res[0])
+        
+        # Branches Reporting
+        if branch_code == "ALL":
+            where_br, params_br = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
+            cursor.execute(f"SELECT COUNT(DISTINCT BRANCH_CODE) FROM DEPOSITS_BALANCE_FILE_DEPD0586 {where_br}", params_br)
+            res = cursor.fetchone()
+            if res and res[0]: data["branches_reporting"] = res[0]
+        else:
+            data["branches_reporting"] = 1
+            
+    except Exception as e:
+        print(f"Error calculating KPIs: {e}")
+        
+    conn.close()
     return data
 
 # ==========================================
@@ -589,20 +672,33 @@ def get_loan_npa_summary(branch_code: str = "ALL"):
     }
 
 @app.get("/api/npa-branch-wise")
-def get_npa_branch_wise():
+@lru_cache(maxsize=128)
+def get_npa_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    where_npa, params_npa = get_date_filter_sql(period, "NPA_STMT", "WHERE")
+    
+    if branch_code != "ALL":
+        where_npa += " AND n.BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE n.BRANCH_CODE = ?"
+        params_npa.append(branch_code)
+        
+    if "WHERE" in where_npa:
+        where_npa += " AND n.BRANCH_CODE IS NOT NULL AND n.BRANCH_CODE != ''"
+    else:
+        where_npa = "WHERE n.BRANCH_CODE IS NOT NULL AND n.BRANCH_CODE != ''"
+        
     try:
-        cursor.execute("""
-            SELECT TOP 10 
+        cursor.execute(f"""
+            SELECT 
                 COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = n.BRANCH_CODE), n.BRANCH_CODE) as BRANCH_NAME,
                 SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa, 
                 SUM(TRY_CAST(INCA AS FLOAT)) as covered
             FROM NPA_STMT n
-            WHERE n.BRANCH_CODE IS NOT NULL AND n.BRANCH_CODE != ''
+            {where_npa}
             GROUP BY n.BRANCH_CODE
             ORDER BY npa DESC
-        """)
+        """, params_npa)
         rows = cursor.fetchall()
         data = [{"name": r[0][:15] if r[0] else "Unknown", "NPA": abs(r[1] or 0), "Covered": abs(r[2] or 0)} for r in rows]
     except Exception as e:
@@ -612,16 +708,24 @@ def get_npa_branch_wise():
     return data
 
 @app.get("/api/loan-branch-wise")
-def get_loan_branch_wise():
+@lru_cache(maxsize=128)
+def get_loan_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
+    where_loan, params_loan = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET")
+    
+    if branch_code != "ALL":
+        where_loan += " AND BRANCH_CODE = ?" if "WHERE" in where_loan else " WHERE BRANCH_CODE = ?"
+        params_loan.append(branch_code)
+        
     try:
-        cursor.execute("""
-            SELECT TOP 15 BRANCH_NAME, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as loans
+        cursor.execute(f"""
+            SELECT BRANCH_NAME, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as loans
             FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
+            {where_loan}
             GROUP BY BRANCH_NAME
             ORDER BY loans DESC
-        """)
+        """, params_loan)
         rows = cursor.fetchall()
         data = [{"name": r[0][:10] if r[0] else "Unknown", "Loans": abs(r[1] or 0)} for r in rows]
     except:
@@ -630,14 +734,15 @@ def get_loan_branch_wise():
     return data
 
 @app.get("/api/loan-type-distribution")
-def get_loan_type_distribution(branch_code: str = "ALL"):
+@lru_cache(maxsize=128)
+def get_loan_type_distribution(branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
-    where_clause = ""
-    params = []
+    where_clause, params = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET")
+    
     if branch_code != "ALL":
-        where_clause = "WHERE BRANCH_CODE = ?"
-        params = [branch_code]
+        where_clause += " AND BRANCH_CODE = ?" if "WHERE" in where_clause else " WHERE BRANCH_CODE = ?"
+        params.append(branch_code)
     try:
         cursor.execute(f"""
             SELECT TOP 10 PRODUCT_NAME, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as amount
@@ -654,17 +759,27 @@ def get_loan_type_distribution(branch_code: str = "ALL"):
     return data
 
 @app.get("/api/loan-type-branches")
-def get_loan_type_branches(product_name: str):
+@lru_cache(maxsize=128)
+def get_loan_type_branches(product_name: str, branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
+    where_clause, params = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET")
+    
+    where_clause += " AND PRODUCT_NAME = ?" if "WHERE" in where_clause else " WHERE PRODUCT_NAME = ?"
+    params.append(product_name)
+    
+    if branch_code != "ALL":
+        where_clause += " AND BRANCH_CODE = ?"
+        params.append(branch_code)
+        
     try:
-        cursor.execute("""
-            SELECT TOP 10 BRANCH_NAME, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as amount
+        cursor.execute(f"""
+            SELECT BRANCH_NAME, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as amount
             FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
-            WHERE PRODUCT_NAME = ?
+            {where_clause}
             GROUP BY BRANCH_NAME
             ORDER BY amount DESC
-        """, [product_name])
+        """, params)
         rows = cursor.fetchall()
         data = [{"name": r[0][:15] if r[0] else "Unknown", "value": abs(r[1] or 0)} for r in rows]
     except:
