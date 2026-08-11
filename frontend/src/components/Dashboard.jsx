@@ -157,6 +157,8 @@ const Dashboard = () => {
       setModalData([]);
       const endpoint = activeModal === 'deposits' ? 'deposit-branch-wise' 
                      : activeModal === 'loans' ? 'loan-branch-wise' 
+                     : activeModal === 'opened' ? 'opened-branch-wise'
+                     : activeModal === 'closed' ? 'closed-branch-wise'
                      : 'npa-branch-wise';
       const activePeriod = exactDate || selectedPeriod;               
       fetch(`http://localhost:8000/api/${endpoint}?branch_code=${selectedBranch}&period=${activePeriod}`)
@@ -166,6 +168,8 @@ const Dashboard = () => {
                 setModalData(data.map(d => ({ name: d.name, value: (d.NPA || 0) / 100000, rawValue: d.NPA || 0 })));
             } else if (activeModal === 'loans') {
                 setModalData(data.map(d => ({ name: d.name, value: (d.Loans || 0) / 100000, rawValue: d.Loans || 0 })));
+            } else if (activeModal === 'opened' || activeModal === 'closed') {
+                setModalData(data.map(d => ({ name: d.name, value: d.value || 0, rawValue: d.value || 0 })));
             } else {
                 setModalData(data.map(d => ({ name: d.name, value: (d.value || 0) / 100000, rawValue: d.value || 0 })));
             }
@@ -290,7 +294,7 @@ const Dashboard = () => {
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{formatAmount(kpiData?.total_npa || 0)}</div>
             </div>
             
-            <div className="card" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
+            <div className="card" onClick={() => { if (selectedBranch === 'ALL') setActiveModal('opened') }} style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>Accounts Opened</span>
                 <div style={{ background: '#DCFCE7', color: '#16A34A', padding: '8px', borderRadius: '8px' }}><FileText size={20} /></div>
@@ -298,7 +302,7 @@ const Dashboard = () => {
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{accountMetrics?.opened?.toLocaleString() || 0}</div>
             </div>
 
-            <div className="card" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
+            <div className="card" onClick={() => { if (selectedBranch === 'ALL') setActiveModal('closed') }} style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>Accounts Closed</span>
                 <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '8px', borderRadius: '8px' }}><FileText size={20} /></div>
@@ -517,7 +521,7 @@ const Dashboard = () => {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '80%', maxWidth: '900px', height: '500px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: 0, fontSize: '20px', color: '#0F172A', fontWeight: '600' }}>
-                Top Branches by {activeModal === 'deposits' ? 'Deposits' : activeModal === 'loans' ? 'Loans' : 'NPA'}
+                Top Branches by {activeModal === 'deposits' ? 'Deposits' : activeModal === 'loans' ? 'Loans' : activeModal === 'opened' ? 'Accounts Opened' : activeModal === 'closed' ? 'Accounts Closed' : 'NPA'}
               </h2>
               <button onClick={() => setActiveModal(null)} style={{ padding: '8px 16px', background: '#F1F5F9', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', color: '#475569' }}>Close</button>
             </div>
@@ -543,10 +547,10 @@ const Dashboard = () => {
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', border: '1px solid #E5E7EB', borderRadius: '8px' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead style={{ position: 'sticky', top: 0, background: '#F8FAFC', zIndex: 1, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-                      <tr>
-                        <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', width: '50px' }}>#</th>
+                      <tr style={{ background: '#F8FAFC' }}>
+                        <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', width: '60px' }}>Rank</th>
                         <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB' }}>Branch Name</th>
-                        <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', textAlign: 'right', width: '150px' }}>Amount</th>
+                        <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', textAlign: 'right', width: '150px' }}>{(activeModal === 'opened' || activeModal === 'closed') ? 'Count' : 'Amount'}</th>
                         <th style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#475569', borderBottom: '1px solid #E5E7EB', width: '150px' }}>Visual</th>
                       </tr>
                     </thead>
@@ -554,12 +558,18 @@ const Dashboard = () => {
                       {modalData.map((row, index) => {
                         const maxVal = Math.max(...modalData.map(d => d.value));
                         const percent = maxVal === 0 ? 0 : (row.value / maxVal) * 100;
-                        const barColor = activeModal === 'deposits' ? '#38BDF8' : activeModal === 'loans' ? '#FBBF24' : '#F87171';
+                        const barColor = activeModal === 'deposits' ? '#38BDF8' 
+                                       : activeModal === 'loans' ? '#FBBF24' 
+                                       : activeModal === 'opened' ? '#16A34A'
+                                       : activeModal === 'closed' ? '#DC2626'
+                                       : '#F87171';
                         return (
                           <tr key={index} style={{ borderBottom: '1px solid #F1F5F9', background: index % 2 === 0 ? '#FFFFFF' : '#F8FAFC' }}>
                             <td style={{ padding: '12px 16px', fontSize: '14px', color: '#64748B' }}>{index + 1}</td>
                             <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '500', color: '#0F172A' }}>{row.name}</td>
-                            <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#0F172A', textAlign: 'right' }}>{formatAmount(row.rawValue)}</td>
+                            <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#0F172A', textAlign: 'right' }}>
+                              {(activeModal === 'opened' || activeModal === 'closed') ? row.rawValue.toLocaleString() : formatAmount(row.rawValue)}
+                            </td>
                             <td style={{ padding: '12px 16px' }}>
                               <div style={{ width: '100%', height: '8px', background: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
                                 <div style={{ width: `${percent}%`, height: '100%', background: barColor, borderRadius: '4px' }}></div>

@@ -100,6 +100,60 @@ def get_branch_comparison(branch_code: str = "ALL", period: str = "ALL"):
     conn.close()
     return data
 
+@app.get("/api/opened-branch-wise")
+@lru_cache(maxsize=128)
+def get_opened_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    where_sql, params = get_date_filter_sql(period, "ACCOUNT_OPENED_REPORT")
+    if branch_code != "ALL":
+        where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
+        params.append(branch_code)
+        
+    try:
+        cursor.execute(f"""
+            SELECT BRANCH_NAME, COUNT(*) as cnt
+            FROM ACCOUNT_OPENED_REPORT
+            {where_sql}
+            GROUP BY BRANCH_NAME
+            ORDER BY cnt DESC
+        """, params)
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1]} for r in rows]
+    except Exception as e:
+        print(f"Error calculating branch-wise opened: {e}")
+        data = []
+    conn.close()
+    return data
+
+@app.get("/api/closed-branch-wise")
+@lru_cache(maxsize=128)
+def get_closed_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    where_sql, params = get_date_filter_sql(period, "ACCOUNT_CLOSED_REPORT")
+    if branch_code != "ALL":
+        where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
+        params.append(branch_code)
+        
+    try:
+        cursor.execute(f"""
+            SELECT BRANCH_NAME, COUNT(*) as cnt
+            FROM ACCOUNT_CLOSED_REPORT
+            {where_sql}
+            GROUP BY BRANCH_NAME
+            ORDER BY cnt DESC
+        """, params)
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1]} for r in rows]
+    except Exception as e:
+        print(f"Error calculating branch-wise closed: {e}")
+        data = []
+    conn.close()
+    return data
+
 @app.get("/api/deposit-branch-wise")
 @lru_cache(maxsize=128)
 def get_deposit_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
