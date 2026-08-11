@@ -1,10 +1,12 @@
 import os
 import pyodbc
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from functools import lru_cache
-load_dotenv('app/.env')
+import shutil
+
+load_dotenv('.env')
 
 app = FastAPI(title="Banking MIS API")
 
@@ -25,9 +27,17 @@ def get_db_connection():
     return pyodbc.connect(conn_str)
 
 def get_date_filter_sql(period: str, table_name: str, prefix: str = "WHERE", date_col: str = "PROC_DATE"):
-    """Generates SQL condition for filtering by period based on the max date in the table."""
+    """Generates SQL condition for filtering by period based on the max date in the table, or by exact date."""
     if period == "ALL" or not period:
         return "", []
+        
+    import re
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", period):
+        # Exact date provided (YYYY-MM-DD)
+        # Convert PROC_DATE (dd/mm/yyyy) to match exact date
+        sql = f" {prefix} CONVERT(date, {table_name}.{date_col}, 103) = CONVERT(date, ?, 120) "
+        return sql, [period]
+        
     days = 0
     if period == "7D": days = 7
     elif period == "30D": days = 30
@@ -76,7 +86,7 @@ def get_branch_comparison(branch_code: str = "ALL", period: str = "ALL"):
         
     try:
         cursor.execute(f"""
-            SELECT TOP 10 BRANCH_NAME, SUM(TRY_CAST(BALANCE_LCY AS FLOAT)) as total_deposit 
+            SELECT TOP 10 BRANCH_NAME, SUM(TRY_CAST(CURRENT_BALANCE AS FLOAT)) as total_deposit 
             FROM DEPOSITS_BALANCE_FILE_DEPD0586
             {where_sql}
             GROUP BY BRANCH_NAME
@@ -907,6 +917,61 @@ def get_report_stats(table_name: str, branch_code: str = "ALL"):
         "distribution": sorted(distribution, key=lambda x: x["value"], reverse=True),
         "distribution_column": cat_col.replace('_', ' ').title() if cat_col else None
     }
+
+@app.get("/api/account-metrics")
+def get_account_metrics(branch_code: str = "ALL", period: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    data = {"opened": 0, "closed": 0}
+    
+    try:
+        where_sql, params = get_date_filter_sql(period, "ACCOUNT_OPENED_REPORT")
+        if branch_code != "ALL":
+            where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
+            params.append(branch_code)
+        
+        cursor.execute(f"SELECT COUNT(*) FROM ACCOUNT_OPENED_REPORT {where_sql}", params)
+        res = cursor.fetchone()
+        if res: data["opened"] = res[0]
+        
+        where_sql, params = get_date_filter_sql(period, "ACCOUNT_CLOSED_REPORT")
+        if branch_code != "ALL":
+            where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
+            params.append(branch_code)
+            
+        cursor.execute(f"SELECT COUNT(*) FROM ACCOUNT_CLOSED_REPORT {where_sql}", params)
+        res = cursor.fetchone()
+        if res: data["closed"] = res[0]
+        
+    except Exception as e:
+        print(f"Error getting account metrics: {e}")
+        
+    conn.close()
+    return data
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        from app.parser.dispatcher import process_file
+        
+        # Ensure uploads directory exists
+        upload_dir = os.path.join(os.path.dirname(__file__), "..", "data", "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        file_path = os.path.join(upload_dir, file.filename)
+        
+        # Save file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Process file directly into DB
+        process_file(file_path)
+        
+        return {"status": "success", "message": f"File {file.filename} processed successfully"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

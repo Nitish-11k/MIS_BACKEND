@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, Calendar, Settings2, MapPin } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Calendar, Settings2, MapPin, Upload } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, PieChart, Pie, Cell, ComposedChart, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import DynamicReportView from './DynamicReportView';
 
@@ -59,9 +59,43 @@ const Dashboard = () => {
   const [loanTypeData, setLoanTypeData] = useState([]);
   const [selectedLoanType, setSelectedLoanType] = useState(null);
   const [loanTypeBranches, setLoanTypeBranches] = useState([]);
+  
+  // Upload state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async () => {
+    if (!uploadFile) return;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+
+    try {
+      const response = await fetch('http://localhost:8000/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        alert('File uploaded and processed successfully! Refreshing data...');
+        window.location.reload();
+      } else {
+        alert('Error: ' + data.message);
+      }
+    } catch (err) {
+      alert('Upload failed: ' + err.message);
+    } finally {
+      setUploading(false);
+      setShowUploadModal(false);
+      setUploadFile(null);
+    }
+  };
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [selectedPeriod, setSelectedPeriod] = useState('ALL');
+  const [exactDate, setExactDate] = useState('');
   const [kpiData, setKpiData] = useState({ total_deposits: 0, total_loans: 0, total_npa: 0, branches_reporting: 0 });
+  const [accountMetrics, setAccountMetrics] = useState({ opened: 0, closed: 0 });
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState(null);
   const [modalData, setModalData] = useState([]);
@@ -78,20 +112,23 @@ const Dashboard = () => {
 
   useEffect(() => {
     setLoading(true);
+    const activePeriod = exactDate || selectedPeriod;
     
     Promise.all([
-      fetch(`http://localhost:8000/api/branch-comparison?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/loan-branch-wise?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/kpi-summary?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/branch-comparison?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/loan-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/kpi-summary?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
       fetch(`http://localhost:8000/api/loan-npa-summary?branch_code=${selectedBranch}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/loan-type-distribution?branch_code=${selectedBranch}&period=${selectedPeriod}`).then(res => res.json())
-    ]).then(([compData, npaData, loanBranchData, kpiSummary, loanNpaSum, typeDistData]) => {
+      fetch(`http://localhost:8000/api/loan-type-distribution?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/account-metrics?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json())
+    ]).then(([compData, npaData, loanBranchData, kpiSummary, loanNpaSum, typeDistData, accountData]) => {
       setTopBranches(compData);
       setNpaBranchData(npaData);
       setLoanBranchData(loanBranchData);
       setKpiData(kpiSummary);
       setLoanNpaSummary(loanNpaSum);
+      setAccountMetrics(accountData || { opened: 0, closed: 0 });
       
       const normalized = typeDistData.map(d => ({ ...d, rawValue: d.value, value: d.value / 100000 }));
       setLoanTypeData(normalized);
@@ -101,16 +138,17 @@ const Dashboard = () => {
       console.error(err);
       setLoading(false);
     });
-  }, [selectedBranch, selectedPeriod]);
+  }, [selectedBranch, selectedPeriod, exactDate]);
 
   useEffect(() => {
     if (selectedLoanType) {
-      fetch(`http://localhost:8000/api/loan-type-branches?product_name=${encodeURIComponent(selectedLoanType)}&branch_code=${selectedBranch}&period=${selectedPeriod}`)
+      const activePeriod = exactDate || selectedPeriod;
+      fetch(`http://localhost:8000/api/loan-type-branches?product_name=${encodeURIComponent(selectedLoanType)}&branch_code=${selectedBranch}&period=${activePeriod}`)
         .then(res => res.json())
         .then(data => setLoanTypeBranches(data))
         .catch(console.error);
     }
-  }, [selectedLoanType, selectedBranch, selectedPeriod]);
+  }, [selectedLoanType, selectedBranch, selectedPeriod, exactDate]);
 
 
 
@@ -120,8 +158,8 @@ const Dashboard = () => {
       const endpoint = activeModal === 'deposits' ? 'deposit-branch-wise' 
                      : activeModal === 'loans' ? 'loan-branch-wise' 
                      : 'npa-branch-wise';
-                     
-      fetch(`http://localhost:8000/api/${endpoint}?branch_code=${selectedBranch}&period=${selectedPeriod}`)
+      const activePeriod = exactDate || selectedPeriod;               
+      fetch(`http://localhost:8000/api/${endpoint}?branch_code=${selectedBranch}&period=${activePeriod}`)
         .then(res => res.json())
           .then(data => {
             if (activeModal === 'npa') {
@@ -134,7 +172,7 @@ const Dashboard = () => {
           })
         .catch(console.error);
     }
-  }, [activeModal, selectedPeriod]);
+  }, [activeModal, selectedPeriod, exactDate]);
 
   return (
     <div className="app-container">
@@ -166,13 +204,38 @@ const Dashboard = () => {
           </div>
           
           <div className="header-controls" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            {/* Period Dropdown */}
+            {/* Upload Button */}
+            <button 
+              onClick={() => setShowUploadModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#2563EB', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: '500', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+            >
+              <Upload size={18} />
+              Upload Data
+            </button>
+
+            {/* Exact Date Picker */}
             <div className="branch-selector-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', padding: '8px 12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <input 
+                type="date"
+                value={exactDate}
+                onChange={(e) => {
+                  setExactDate(e.target.value);
+                  if (e.target.value) setSelectedPeriod('ALL');
+                }}
+                style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '600', color: '#0B1F3A', cursor: 'pointer' }}
+              />
+            </div>
+
+            {/* Period Dropdown */}
+            <div className="branch-selector-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', padding: '8px 12px', borderRadius: '8px', border: '1px solid #E2E8F0', opacity: exactDate ? 0.5 : 1, pointerEvents: exactDate ? 'none' : 'auto' }}>
               <Calendar size={18} color="#6B7280" />
               <select 
                 className="branch-selector" 
                 value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
+                onChange={(e) => {
+                  setSelectedPeriod(e.target.value);
+                  setExactDate('');
+                }}
                 style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '600', color: '#0B1F3A', cursor: 'pointer' }}
               >
                 <option value="ALL">All Time</option>
@@ -225,6 +288,22 @@ const Dashboard = () => {
                 <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '8px', borderRadius: '8px' }}><FileText size={20} /></div>
               </div>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{formatAmount(kpiData?.total_npa || 0)}</div>
+            </div>
+            
+            <div className="card" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>Accounts Opened</span>
+                <div style={{ background: '#DCFCE7', color: '#16A34A', padding: '8px', borderRadius: '8px' }}><FileText size={20} /></div>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{accountMetrics?.opened?.toLocaleString() || 0}</div>
+            </div>
+
+            <div className="card" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>Accounts Closed</span>
+                <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '8px', borderRadius: '8px' }}><FileText size={20} /></div>
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#0F172A' }}>{accountMetrics?.closed?.toLocaleString() || 0}</div>
             </div>
 
             <div className="card" style={{ padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', border: '1px solid #E2E8F0' }}>
@@ -497,8 +576,27 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '400px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', color: '#0F172A', fontWeight: '600' }}>Upload Data File</h2>
+            <div style={{ border: '2px dashed #CBD5E1', borderRadius: '8px', padding: '32px', textAlign: 'center', marginBottom: '20px', background: '#F8FAFC' }}>
+              <Upload size={32} color="#64748B" style={{ marginBottom: '12px' }} />
+              <div style={{ fontSize: '14px', color: '#475569', marginBottom: '8px' }}>Select a .txt, .gz, or .xlsx file</div>
+              <input type="file" accept=".txt,.xlsx,.gz,.csv" onChange={(e) => setUploadFile(e.target.files[0])} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button disabled={uploading} onClick={() => setShowUploadModal(false)} style={{ padding: '8px 16px', background: '#F1F5F9', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', color: '#475569' }}>Cancel</button>
+              <button disabled={uploading || !uploadFile} onClick={handleUpload} style={{ padding: '8px 16px', background: '#2563EB', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', color: '#fff' }}>
+                {uploading ? 'Processing...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
+}
 
 export default Dashboard;
