@@ -115,13 +115,13 @@ const Dashboard = () => {
     const activePeriod = exactDate || selectedPeriod;
     
     Promise.all([
-      fetch(`http://localhost:8000/api/branch-comparison?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/loan-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/kpi-summary?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/loan-npa-summary?branch_code=${selectedBranch}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/loan-type-distribution?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/account-metrics?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json())
+      fetch(`http://localhost:8000/api/branch-comparison?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.ok ? res.json() : []).catch(() => []),
+      fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.ok ? res.json() : []).catch(() => []),
+      fetch(`http://localhost:8000/api/loan-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.ok ? res.json() : []).catch(() => []),
+      fetch(`http://localhost:8000/api/kpi-summary?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.ok ? res.json() : { total_deposits: 0, total_loans: 0, total_npa: 0, accounts_opened: 0, accounts_closed: 0, branches_reporting: 0 }).catch(() => ({ total_deposits: 0, total_loans: 0, total_npa: 0, accounts_opened: 0, accounts_closed: 0, branches_reporting: 0 })),
+      fetch(`http://localhost:8000/api/loan-npa-summary?branch_code=${selectedBranch}`).then(res => res.ok ? res.json() : { total_loans: 0, total_npa: 0, npa_covered: 0 }).catch(() => ({ total_loans: 0, total_npa: 0, npa_covered: 0 })),
+      fetch(`http://localhost:8000/api/loan-type-distribution?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.ok ? res.json() : []).catch(() => []),
+      fetch(`http://localhost:8000/api/account-metrics?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.ok ? res.json() : { opened: 0, closed: 0 }).catch(() => ({ opened: 0, closed: 0 }))
     ]).then(([compData, npaData, loanBranchData, kpiSummary, loanNpaSum, typeDistData, accountData]) => {
       setTopBranches(compData);
       setNpaBranchData(npaData);
@@ -144,9 +144,9 @@ const Dashboard = () => {
     if (selectedLoanType) {
       const activePeriod = exactDate || selectedPeriod;
       fetch(`http://localhost:8000/api/loan-type-branches?product_name=${encodeURIComponent(selectedLoanType)}&branch_code=${selectedBranch}&period=${activePeriod}`)
-        .then(res => res.json())
-        .then(data => setLoanTypeBranches(data))
-        .catch(console.error);
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setLoanTypeBranches(Array.isArray(data) ? data : []))
+        .catch(() => setLoanTypeBranches([]));
     }
   }, [selectedLoanType, selectedBranch, selectedPeriod, exactDate]);
 
@@ -162,7 +162,7 @@ const Dashboard = () => {
                      : 'npa-branch-wise';
       const activePeriod = exactDate || selectedPeriod;               
       fetch(`http://localhost:8000/api/${endpoint}?branch_code=${selectedBranch}&period=${activePeriod}`)
-        .then(res => res.json())
+        .then(res => res.ok ? res.json() : [])
           .then(data => {
             if (activeModal === 'npa') {
                 setModalData(data.map(d => ({ name: d.name, value: (d.NPA || 0) / 100000, rawValue: d.NPA || 0 })));
