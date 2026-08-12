@@ -23,8 +23,8 @@ def parse(raw_lines):
             amount_dr = line[67:90].strip()
             amount_cr = line[90:113].strip()
             balance = line[113:137].strip()
-            statement_narrative = line[137:187].strip()
-            ref_no = line[187:].strip()
+            statement_narrative = line[137:190].strip()
+            ref_no = line[190:].strip()
             
             row = {
                 "S1_NO": s1,

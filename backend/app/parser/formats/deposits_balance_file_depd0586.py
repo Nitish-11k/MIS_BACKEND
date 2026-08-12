@@ -34,14 +34,14 @@ def parse(raw_lines):
             "CURRENT_BALANCE": line[165:188].strip(),
             "LIMIT": line[188:210].strip(),
             "TERM": line[210:223].strip(),
-            "INT_RATE": "",
-            "STATUS": "",
-            "JOINT_HOLD_FLAG": line[253:].strip(),
+            "INT_RATE": line[223:227].strip(),
+            "STATUS": line[227:265].strip(),
+            "JOINT_HOLD_FLAG": line[265:].strip(),
         }
         
         # INT_RATE and STATUS are often merged in the raw file at positions 223-253
         # e.g. "8.00     OPEN" - we need to split them
-        raw_int_status = line[223:253].strip()
+        raw_int_status = line[229:265].strip()
         if raw_int_status:
             parts = raw_int_status.split()
             if len(parts) >= 2:

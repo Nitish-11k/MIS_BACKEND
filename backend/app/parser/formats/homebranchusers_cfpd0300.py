@@ -25,15 +25,17 @@ def parse(raw_lines):
         if not data_started:
             continue
             
+        parts = __import__('re').split(r'\s{2,}', line.strip())
+        
         row = {
-            "USER_ID": line[0:8].strip(),
-            "USER_NAME": line[9:34].strip(),
-            "USER_CAPABILITY_LEVEL": line[35:53].strip(),
-            "DATA_SECURITY_LEVEL": line[54:70].strip(),
-            "DATA_SECURITY_GROUP": line[71:88].strip(),
-            "USER_STATUS": line[89:108].strip(),
-            "DESIGNATION": line[109:128].strip(),
-            "DIVISION": line[129:].strip(),
+            "USER_ID": parts[0] if len(parts) > 0 else "",
+            "USER_NAME": parts[1] if len(parts) > 1 else "",
+            "USER_CAPABILITY_LEVEL": parts[2] if len(parts) > 2 else "",
+            "DATA_SECURITY_LEVEL": parts[3] if len(parts) > 3 else "",
+            "DATA_SECURITY_GROUP": parts[4] if len(parts) > 4 else "",
+            "USER_STATUS": parts[5] if len(parts) > 5 else "",
+            "DESIGNATION": parts[6] if len(parts) > 6 else "",
+            "DIVISION": parts[7] if len(parts) > 7 else "",
         }
         
         # skip lines that are obviously just leftover headers or empty

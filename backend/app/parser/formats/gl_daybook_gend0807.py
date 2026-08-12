@@ -71,9 +71,9 @@ def parse(raw_lines):
             "TXN_TYPE": line[80:102].strip(),
             "CHEQUE_NO": line[102:125].strip(),
             "DEBIT": line[125:150].strip(),
-            "CREDIT": line[150:175].strip(),
-            "USER_ID": line[175:185].strip(),
-            "CHK1_ID": line[185:195].strip(),
+            "CREDIT": line[150:170].strip(),
+            "USER_ID": line[170:180].strip(),
+            "CHK1_ID": line[180:195].strip(),
             "CHK2_ID": line[195:205].strip(),
             "SUP_ID": line[205:].strip(),
         }

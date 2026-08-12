@@ -31,17 +31,17 @@ def parse(raw_lines):
             continue
             
         row = {
-            "TRAN_CODE": line[0:9].strip(),
-            "RESULT": line[10:16].strip(),
-            "JRNL_NO": line[17:33].strip(),
-            "ACCOUNT_NO": line[34:59].strip(),
-            "AMOUNT": line[60:69].strip(),
-            "SUP_ID": line[70:76].strip(),
-            "SUP_ERR_NO": line[77:93].strip(),
-            "ERROR_DESC": line[94:122].strip(),
-            "OUTSTANDING": line[123:146].strip(),
-            "LIMIT_AMOUNT": line[147:178].strip(),
-            "CUSTOMER_NAME": line[179:].strip(),
+            "TRAN_CODE": line[0:10].strip(),
+            "RESULT": line[10:17].strip(),
+            "JRNL_NO": line[17:32].strip(),
+            "ACCOUNT_NO": line[32:46].strip(),
+            "AMOUNT": line[46:69].strip(),
+            "SUP_ID": line[69:77].strip(),
+            "SUP_ERR_NO": line[77:82].strip(),
+            "ERROR_DESC": line[82:122].strip(),
+            "OUTSTANDING": line[122:146].strip(),
+            "LIMIT_AMOUNT": line[146:166].strip(),
+            "CUSTOMER_NAME": line[166:].strip(),
         }
         
         # skip lines that are obviously empty or headers

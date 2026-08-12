@@ -40,7 +40,7 @@ def process_file(filepath):
     parser_func = REGISTRY[report_id]
     rows = parser_func(raw_lines)
 
-    table_name = table_name_from_filename(filepath)
+    table_name = parser_func.__module__.split('.')[-1].upper()
 
     if not rows:
         print(f"WARNING: 0 rows extracted from {filepath}")
