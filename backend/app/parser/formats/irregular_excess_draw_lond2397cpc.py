@@ -118,6 +118,16 @@ def parse(raw_lines):
             if not first_val or "TOTAL" in str(first_val).upper():
                 continue
                 
+            # Digit validation to skip garbage rows
+            has_digit_start = False
+            for val in row.values():
+                if val and str(val).strip() and str(val).strip()[0].isdigit():
+                    has_digit_start = True
+                    break
+                    
+            if not has_digit_start:
+                continue
+                
         rows.append(row)
 
     if not rows:

@@ -41,5 +41,12 @@ def extract_metadata(lines):
     if metadata["BRANCH_NAME"] == "":
         if metadata["BRANCH_CODE"] == "00001":
             metadata["BRANCH_NAME"] = "HEAD OFFICE"
+            
+    if metadata["REPORT_ID"] == "BR2482-01":
+        full_text = "\n".join(lines[:30]).upper()
+        if "LOGGED ON BUT NO TRANSACTIONS" in full_text:
+            metadata["REPORT_ID"] = "BR2482-02"
+        elif "TERMINALS NOT LOGGED ON" in full_text:
+            metadata["REPORT_ID"] = "BR2482-03"
 
     return metadata

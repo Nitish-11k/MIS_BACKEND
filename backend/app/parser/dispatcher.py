@@ -20,7 +20,7 @@ def table_name_from_filename(filepath):
 
 
 def process_file(filepath):
-    raw_lines = read_report_lines(filepath)
+    raw_lines = list(read_report_lines(filepath))
     metadata = extract_metadata(raw_lines)
     report_id = metadata.get("REPORT_ID", "UNKNOWN")
     

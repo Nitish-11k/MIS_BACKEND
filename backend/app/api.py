@@ -1004,7 +1004,7 @@ def get_account_metrics(branch_code: str = "ALL", period: str = "ALL"):
     return data
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(files: list[UploadFile] = File(...)):
     try:
         from app.parser.dispatcher import process_file
         
@@ -1012,16 +1012,31 @@ async def upload_file(file: UploadFile = File(...)):
         upload_dir = os.path.join(os.path.dirname(__file__), "..", "data", "uploads")
         os.makedirs(upload_dir, exist_ok=True)
         
-        file_path = os.path.join(upload_dir, file.filename)
+        results = []
+        for file in files:
+            try:
+                # Ensure we only use the base filename to prevent directory not found errors
+                # when frontend sends paths (e.g. from folder uploads)
+                safe_filename = os.path.basename(file.filename)
+                file_path = os.path.join(upload_dir, safe_filename)
+                
+                # Save file
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                    
+                # Process file directly into DB
+                table_name = process_file(file_path)
+                
+                if table_name:
+                    results.append({"filename": file.filename, "status": "success", "table": table_name})
+                else:
+                    results.append({"filename": file.filename, "status": "skipped", "message": "Unknown format or skipped"})
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                results.append({"filename": file.filename, "status": "error", "message": str(e)})
         
-        # Save file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        # Process file directly into DB
-        process_file(file_path)
-        
-        return {"status": "success", "message": f"File {file.filename} processed successfully"}
+        return {"status": "success", "results": results}
     except Exception as e:
         import traceback
         traceback.print_exc()

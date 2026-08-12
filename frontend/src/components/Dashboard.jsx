@@ -60,16 +60,17 @@ const Dashboard = () => {
   const [selectedLoanType, setSelectedLoanType] = useState(null);
   const [loanTypeBranches, setLoanTypeBranches] = useState([]);
   
-  // Upload state
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadFiles, setUploadFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
 
   const handleUpload = async () => {
-    if (!uploadFile) return;
+    if (!uploadFiles || uploadFiles.length === 0) return;
     setUploading(true);
     const formData = new FormData();
-    formData.append('file', uploadFile);
+    Array.from(uploadFiles).forEach(file => {
+      formData.append('files', file);
+    });
 
     try {
       const response = await fetch('http://localhost:8000/api/upload', {
@@ -88,7 +89,7 @@ const Dashboard = () => {
     } finally {
       setUploading(false);
       setShowUploadModal(false);
-      setUploadFile(null);
+      setUploadFiles([]);
     }
   };
   const [selectedBranch, setSelectedBranch] = useState('ALL');
@@ -590,16 +591,37 @@ const Dashboard = () => {
       {showUploadModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: '400px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', color: '#0F172A', fontWeight: '600' }}>Upload Data File</h2>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', color: '#0F172A', fontWeight: '600' }}>Bulk Upload Data Files</h2>
             <div style={{ border: '2px dashed #CBD5E1', borderRadius: '8px', padding: '32px', textAlign: 'center', marginBottom: '20px', background: '#F8FAFC' }}>
               <Upload size={32} color="#64748B" style={{ marginBottom: '12px' }} />
-              <div style={{ fontSize: '14px', color: '#475569', marginBottom: '8px' }}>Select a .txt, .gz, or .xlsx file</div>
-              <input type="file" accept=".txt,.xlsx,.gz,.csv" onChange={(e) => setUploadFile(e.target.files[0])} />
+              <div style={{ fontSize: '14px', color: '#475569', marginBottom: '16px' }}>Select multiple files or an entire folder</div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                <div style={{ background: '#fff', padding: '12px', borderRadius: '6px', border: '1px solid #E2E8F0', width: '100%' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Option 1: Select Files</div>
+                  <input type="file" accept=".txt,.xlsx,.gz,.csv" multiple onChange={(e) => setUploadFiles(Array.from(e.target.files))} />
+                </div>
+                
+                <div style={{ background: '#fff', padding: '12px', borderRadius: '6px', border: '1px solid #E2E8F0', width: '100%' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Option 2: Select Folder</div>
+                  <input type="file" webkitdirectory="true" directory="true" multiple onChange={(e) => {
+                    // Filter to only include valid file extensions from the folder
+                    const validFiles = Array.from(e.target.files).filter(f => f.name.match(/\.(txt|csv|xlsx|gz)$/i));
+                    setUploadFiles(validFiles);
+                  }} />
+                </div>
+              </div>
+
+              {uploadFiles && uploadFiles.length > 0 && (
+                <div style={{ marginTop: '16px', fontSize: '14px', color: '#2563EB', fontWeight: '600', background: '#EFF6FF', padding: '8px', borderRadius: '6px' }}>
+                  {uploadFiles.length} valid file(s) selected
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button disabled={uploading} onClick={() => setShowUploadModal(false)} style={{ padding: '8px 16px', background: '#F1F5F9', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', color: '#475569' }}>Cancel</button>
-              <button disabled={uploading || !uploadFile} onClick={handleUpload} style={{ padding: '8px 16px', background: '#2563EB', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', color: '#fff' }}>
-                {uploading ? 'Processing...' : 'Upload'}
+              <button disabled={uploading || uploadFiles.length === 0} onClick={handleUpload} style={{ padding: '8px 16px', background: '#2563EB', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', color: '#fff' }}>
+                {uploading ? 'Processing...' : 'Upload All'}
               </button>
             </div>
           </div>

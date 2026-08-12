@@ -19,6 +19,14 @@ def parse(raw_lines):
         # Stop on 'TOTAL:' or similar footer
         if "TOTAL:" in stripped:
             continue
+        if "INTERNET BANKING" in stripped.upper():
+            continue
+        if "No Internet Banking Transactions" in stripped:
+            continue
+        if "BGL TRANSACTIONS" in stripped.upper():
+            continue
+        if "No BGL Transactions" in stripped:
+            continue
             
         if set(stripped) <= {'-', '_'}:
             dash_count += 1

@@ -10,10 +10,12 @@ from app.parser.formats import deposits_balance_file_depd0586, drawing_power_lon
 from app.parser.formats import exception_report_for_interest_rates_variation_depd0650, gend1012_prt
 from app.parser.formats import gend1012_prt2, dep_shadow_file, glcc_wise_bal_rep, glcc_wise_sum_rep
 from app.parser.formats import npa_stmt
+from app.parser.formats import account_opened_report, account_closed_report
+from app.parser.formats import id_users_logged_no_transactions_lond2482, id_users_terminals_not_logged_lond2482
 
 REGISTRY = {
-    "ACTCLS-01": simple_fixed_width.parse,
-    "ACTOPN-01": simple_fixed_width.parse,
+    "ACTCLS-01": account_closed_report.parse,
+    "ACTOPN-01": account_opened_report.parse,
     "AU0035-01": account_alteration.parse,
     "GL7046-01": bal_in_gl_acc_glcc_wise_det.parse,
     "GL7044-01": bal_in_loan_acc_glcc_wise_det.parse,
@@ -60,4 +62,6 @@ REGISTRY = {
     "SY0331-01": voucher_varification_report_cfpd0331.parse,
     "SY0344-01": voucher_varification_report_cfpd0344.parse,
     "CIFD0528": interbranch_transactions_cifd0528.parse,
+    "BR2482-02": id_users_logged_no_transactions_lond2482.parse,
+    "BR2482-03": id_users_terminals_not_logged_lond2482.parse,
 }

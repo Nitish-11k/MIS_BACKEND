@@ -16,6 +16,11 @@ def parse(raw_lines):
         if not stripped:
             continue
             
+        if "TOT VOUCH" in stripped or "TOTAL" in stripped:
+            continue
+        if "SL-NO" in stripped and "MEMO-HITS" in stripped:
+            continue
+            
         if set(stripped) <= {'-', '_'}:
             dash_count += 1
             if dash_count >= 2:
