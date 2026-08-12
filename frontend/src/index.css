@@ -31,49 +31,6 @@ body {
   min-height: 100vh;
 }
 
-/* Sidebar exactly like image */
-.sidebar {
-  width: 120px;
-  background-color: var(--sidebar-bg);
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  height: 100vh;
-  z-index: 100;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  margin-top: 60px;
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 20px 0;
-  color: white;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  text-align: center;
-}
-
-.nav-item.active {
-  background-color: var(--sidebar-active);
-}
-
-/* Main Content Area */
-.main-content {
-  flex: 1;
-  margin-left: 120px;
-  display: flex;
-  flex-direction: column;
-}
-
 /* Top Header */
 .dashboard-header {
   display: flex;

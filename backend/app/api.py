@@ -675,12 +675,12 @@ def get_least_transactions(branch_code: str = "ALL"):
         
     cursor.execute(f"""
         SELECT TOP 10 ID, 
-            CAST(ISNULL(NULLIF(NO_OF_TXNS_DEBIT, ''), '0') AS FLOAT) as debit,
-            CAST(ISNULL(NULLIF(NO_OF_TXNS_CREDIT, ''), '0') AS FLOAT) as credit,
-            CAST(ISNULL(NULLIF(MEMO_HITS, ''), '0') AS FLOAT) as hits
+            ISNULL(TRY_CAST(NULLIF(NO_OF_TXNS_DEBIT, '') AS FLOAT), 0) as debit,
+            ISNULL(TRY_CAST(NULLIF(NO_OF_TXNS_CREDIT, '') AS FLOAT), 0) as credit,
+            ISNULL(TRY_CAST(NULLIF(MEMO_HITS, '') AS FLOAT), 0) as hits
         FROM ID_LEAST_TRANSACTION_LOND2482
         {where_clause}
-        ORDER BY (CAST(ISNULL(NULLIF(NO_OF_TXNS_DEBIT, ''), '0') AS FLOAT) + CAST(ISNULL(NULLIF(NO_OF_TXNS_CREDIT, ''), '0') AS FLOAT)) ASC
+        ORDER BY (ISNULL(TRY_CAST(NULLIF(NO_OF_TXNS_DEBIT, '') AS FLOAT), 0) + ISNULL(TRY_CAST(NULLIF(NO_OF_TXNS_CREDIT, '') AS FLOAT), 0)) ASC
     """, params)
     rows = cursor.fetchall()
     conn.close()
@@ -688,7 +688,7 @@ def get_least_transactions(branch_code: str = "ALL"):
     data = []
     for row in rows:
         data.append({
-            "id": row[0].strip(),
+            "id": str(row[0]).strip() if row[0] is not None else "",
             "debit": float(row[1]),
             "credit": float(row[2]),
             "hits": float(row[3])
@@ -1045,3 +1045,128 @@ async def upload_file(files: list[UploadFile] = File(...)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.api:app", host="0.0.0.0", port=8000, reload=True)
+
+
+@app.get('/api/data/{table_name}')
+def get_dynamic_data(table_name: str, branch_code: str = 'ALL', page: int = 1, limit: int = 50, search: str = ''):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 1. Validate table exists
+    cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?", (table_name.upper(),))
+    if not cursor.fetchone():
+        return {'columns': [], 'data': [], 'total_records': 0}
+        
+    # 2. Get valid columns and types
+    cursor.execute("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?", (table_name.upper(),))
+    col_info = cursor.fetchall()
+    
+    # Exclude internal IDs
+    exclude_cols = {'ID', 'SR_NO'}
+    columns = [row[0] for row in col_info if row[0].upper() not in exclude_cols]
+    
+    # Identify searchable string columns
+    searchable_cols = [row[0] for row in col_info if row[0].upper() not in exclude_cols and row[1].upper() in ('VARCHAR', 'NVARCHAR', 'CHAR', 'NCHAR', 'TEXT')]
+    
+    if not columns:
+        return {'columns': [], 'data': [], 'total_records': 0}
+
+    # 3. Build WHERE clause
+    where_clauses = ['1=1']
+    params = []
+    
+    if branch_code != 'ALL':
+        where_clauses.append('BRANCH_CODE = ?')
+        params.append(branch_code)
+        
+    if search and searchable_cols:
+        search_term = f"%{search}%"
+        search_clauses = [f"[{c}] LIKE ?" for c in searchable_cols]
+        where_clauses.append(f"({' OR '.join(search_clauses)})")
+        params.extend([search_term] * len(searchable_cols))
+        
+    where_sql = ' AND '.join(where_clauses)
+    
+    # 4. Get Total Records
+    count_query = f"SELECT COUNT(*) FROM [{table_name.upper()}] WHERE {where_sql}"
+    cursor.execute(count_query, tuple(params))
+    total_records = cursor.fetchone()[0]
+    
+    # 5. Get Paginated Data
+    offset = (page - 1) * limit
+    col_select = ', '.join([f"[{c}]" for c in columns])
+    # Order by first column as default to allow OFFSET
+    data_query = f"SELECT {col_select} FROM [{table_name.upper()}] WHERE {where_sql} ORDER BY [{columns[0]}] OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"
+    
+    cursor.execute(data_query, tuple(params + [offset, limit]))
+    
+    rows = []
+    for row in cursor.fetchall():
+        # Handle decimal serialization if necessary, usually PyODBC handles it or fastapi does
+        rows.append(dict(zip(columns, row)))
+        
+    return {
+        'columns': columns,
+        'data': rows,
+        'total_records': total_records
+    }
+
+
+@app.get('/api/visualize/{table_name}')
+def get_visualize_data(table_name: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 1. Validate table exists & has BRANCH_CODE
+    cursor.execute("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?", (table_name.upper(),))
+    columns = [row[0] for row in cursor.fetchall()]
+    
+    if not columns or 'BRANCH_CODE' not in [c.upper() for c in columns]:
+        return []
+        
+    # 2. Sample 1 row to guess numeric columns
+    cursor.execute(f"SELECT TOP 1 * FROM [{table_name.upper()}] WHERE BRANCH_CODE IS NOT NULL")
+    sample_row = cursor.fetchone()
+    
+    if not sample_row:
+        return []
+        
+    row_dict = dict(zip(columns, sample_row))
+    numeric_cols = []
+    
+    exclude_cols = {'ID', 'SR_NO', 'BR_NO', 'ACCT_NO', 'CUST_NO', 'BRANCH_CODE', 'BRANCH_NAME', 'REPORT_ID', 'PROC_DATE'}
+    
+    for col, val in row_dict.items():
+        if col.upper() in exclude_cols:
+            continue
+        if val is None:
+            continue
+        # check if it's a pure number string (ignoring commas for now, assuming parser output is clean or standard float)
+        try:
+            # Handle possible comma formatting in strings
+            clean_val = str(val).replace(',', '')
+            float(clean_val)
+            # If it didn't throw, it's likely numeric
+            # We don't want to sum things like phone numbers, but exclude_cols catches IDs usually
+            # Also exclude date strings that might accidentally parse, though float() usually fails on '25-OCT'
+            numeric_cols.append(col)
+        except ValueError:
+            pass
+            
+    if not numeric_cols:
+        return []
+
+    # 3. Aggregation Query
+    # Use TRY_CAST in SQL Server to avoid crashing on dirty data
+    sum_selects = ', '.join([f"SUM(TRY_CAST(REPLACE([{c}], ',', '') AS FLOAT)) as [{c}]" for c in numeric_cols])
+    query = f"SELECT BRANCH_CODE, {sum_selects} FROM [{table_name.upper()}] WHERE BRANCH_CODE IS NOT NULL GROUP BY BRANCH_CODE"
+    
+    cursor.execute(query)
+    
+    result_columns = [column[0] for column in cursor.description]
+    rows = []
+    for row in cursor.fetchall():
+        row_dict = dict(zip(result_columns, row))
+        rows.append(row_dict)
+        
+    return rows

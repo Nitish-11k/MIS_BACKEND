@@ -10,10 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "date-fns": "^4.4.0",
     "lucide-react": "^1.30.0",
     "react": "^19.2.8",
+    "react-data-table-component": "^8.8.0",
     "react-dom": "^19.2.8",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "styled-components": "^6.5.2"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
