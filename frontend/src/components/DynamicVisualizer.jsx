@@ -16,6 +16,36 @@ const formatAmount = (num) => {
   return `${num.toFixed(0)}`;
 };
 
+// --- DICTIONARY FOR READABLE NAMES ---
+const getReadableName = (key) => {
+  const dictionary = {
+    'BAL_OUTSTAND': 'Outstanding Balance',
+    'OVERDUE_INT': 'Overdue Interest',
+    'IRR_AMT': 'Irregular Amount',
+    'INCA': 'Income Not Collected (INCA)',
+    'UIPY': 'Unrealized Interest (UIPY)',
+    'NI': 'Normal Interest',
+    'OI': 'Overdue Interest',
+    'PRINCIPAL': 'Principal Amount',
+    'TOTAL_OUTSTANDING': 'Total Outstanding',
+    'BAL_IN_GL': 'GL Balance',
+    'DRAWING_POWER': 'Drawing Power',
+    'EXCESS_DRAW': 'Excess Draw',
+    'CREDIT_BAL': 'Credit Balance',
+    'DEBIT_BAL': 'Debit Balance',
+    'TOTAL_CREDIT': 'Total Credit',
+    'TOTAL_DEBIT': 'Total Debit'
+  };
+  
+  if (dictionary[key]) return dictionary[key];
+  
+  // Generic fallback: Replace underscores and Capitalize
+  return key
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
 const DynamicVisualizer = ({ tableName, title }) => {
   const [data, setData] = useState([]);
   const [metrics, setMetrics] = useState([]);
@@ -97,8 +127,17 @@ const DynamicVisualizer = ({ tableName, title }) => {
     );
   }
 
-  const primaryMetric = metrics[0];
-  const secondaryMetric = metrics.length > 1 ? metrics[1] : metrics[0];
+  // Intelligent Metric Separation
+  const balanceMetrics = useMemo(() => {
+    return metrics.filter(m => m.includes('BAL') || m.includes('AMT') || m.includes('DRAW') || m.includes('INCA'));
+  }, [metrics]);
+  
+  const rateMetrics = useMemo(() => {
+    return metrics.filter(m => m.includes('INT') || m.includes('NI') || m.includes('OI') || m.includes('RATE'));
+  }, [metrics]);
+
+  const primaryMetric = balanceMetrics.length > 0 ? balanceMetrics[0] : metrics[0];
+  const secondaryMetric = rateMetrics.length > 0 ? rateMetrics[0] : (metrics.length > 1 ? metrics[1] : metrics[0]);
 
   return (
     <>
@@ -110,7 +149,7 @@ const DynamicVisualizer = ({ tableName, title }) => {
           {/* Donut Chart Widget */}
           <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '20px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
-              Top Distribution ({primaryMetric.replace(/_/g, ' ')})
+              Top Distribution ({getReadableName(primaryMetric)})
             </div>
             <div style={{ flex: 1, position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -138,7 +177,7 @@ const DynamicVisualizer = ({ tableName, title }) => {
           {/* Area/Line Chart Widget */}
           <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '20px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
-              Trend Analysis ({secondaryMetric.replace(/_/g, ' ')})
+              Trend Analysis ({getReadableName(secondaryMetric)})
             </div>
             <div style={{ flex: 1 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -152,7 +191,7 @@ const DynamicVisualizer = ({ tableName, title }) => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={formatAmount} tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value) => [formatAmount(value), secondaryMetric.replace(/_/g, ' ')]} cursor={{ stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '5 5' }} />
+                  <Tooltip formatter={(value) => [formatAmount(value), getReadableName(secondaryMetric)]} cursor={{ stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '5 5' }} />
                   <Area type="monotone" dataKey={secondaryMetric} stroke={COLORS[1]} fillOpacity={1} fill="url(#colorMetric)" style={{ cursor: 'pointer' }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -177,8 +216,8 @@ const DynamicVisualizer = ({ tableName, title }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={formatAmount} tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value, name) => [formatAmount(value), name.replace(/_/g, ' ')]} cursor={{ fill: '#F9FAFB' }} />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                <Tooltip formatter={(value, name) => [formatAmount(value), getReadableName(name)]} cursor={{ fill: '#F9FAFB' }} />
+                <Legend formatter={(value) => getReadableName(value)} wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
                 
                 {metrics.map((metric, idx) => (
                   <Bar 
