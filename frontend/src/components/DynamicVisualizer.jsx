@@ -46,7 +46,7 @@ const getReadableName = (key) => {
     .join(' ');
 };
 
-const DynamicVisualizer = ({ tableName, title }) => {
+const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D', exactDate = '' }) => {
   const [data, setData] = useState([]);
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +56,9 @@ const DynamicVisualizer = ({ tableName, title }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/visualize/${tableName}`)
+    const activePeriod = exactDate || period;
+    const queryParams = new URLSearchParams({ branch_code: branchCode, period: activePeriod }).toString();
+    fetch(`http://localhost:8000/api/visualize/${tableName}?${queryParams}`)
       .then(res => res.json())
       .then(result => {
         if (result && result.length > 0) {
@@ -79,7 +81,7 @@ const DynamicVisualizer = ({ tableName, title }) => {
       })
       .catch(err => console.error("Error fetching visualization data:", err))
       .finally(() => setLoading(false));
-  }, [tableName]);
+  }, [tableName, branchCode, period, exactDate]);
 
   const handleChartClick = (entry) => {
     // entry can be a pie slice, bar segment, or line dot
@@ -93,22 +95,36 @@ const DynamicVisualizer = ({ tableName, title }) => {
     }
   };
 
+  // Intelligent Metric Separation
+  const balanceMetrics = useMemo(() => {
+    return metrics.filter(m => m.includes('BAL') || m.includes('AMT') || m.includes('DRAW') || m.includes('INCA'));
+  }, [metrics]);
+  
+  const rateMetrics = useMemo(() => {
+    return metrics.filter(m => m.includes('INT') || m.includes('NI') || m.includes('OI') || m.includes('RATE'));
+  }, [metrics]);
+
+  const primaryMetric = balanceMetrics.length > 0 ? balanceMetrics[0] : (metrics[0] || '');
+  const secondaryMetric = rateMetrics.length > 0 ? rateMetrics[0] : (metrics.length > 1 ? metrics[1] : (metrics[0] || ''));
+
   // Derived Data for Donut Chart (Top 5 Branches for Metric 1)
   const donutData = useMemo(() => {
-    if (data.length === 0 || metrics.length === 0) return [];
-    const primaryMetric = metrics[0];
-    const sorted = [...data].sort((a, b) => b[primaryMetric] - a[primaryMetric]);
+    if (data.length === 0 || !primaryMetric) return [];
+    // PieChart crashes on negative values, so we use absolute values for proportion
+    const sorted = [...data].sort((a, b) => Math.abs(b[primaryMetric] || 0) - Math.abs(a[primaryMetric] || 0));
     
-    if (sorted.length <= 5) return sorted;
+    if (sorted.length <= 5) {
+      return sorted.map(item => ({ ...item, _abs_val: Math.abs(item[primaryMetric] || 0) }));
+    }
     
-    const top5 = sorted.slice(0, 5);
-    const othersSum = sorted.slice(5).reduce((acc, row) => acc + row[primaryMetric], 0);
+    const top5 = sorted.slice(0, 5).map(item => ({ ...item, _abs_val: Math.abs(item[primaryMetric] || 0) }));
+    const othersSum = sorted.slice(5).reduce((acc, row) => acc + (row[primaryMetric] || 0), 0);
     
     return [
       ...top5,
-      { name: 'Other Branches', [primaryMetric]: othersSum, branchCode: 'ALL' }
+      { name: 'Other Branches', [primaryMetric]: othersSum, _abs_val: Math.abs(othersSum), branchCode: 'ALL' }
     ];
-  }, [data, metrics]);
+  }, [data, primaryMetric]);
 
   if (loading) {
     return (
@@ -126,18 +142,6 @@ const DynamicVisualizer = ({ tableName, title }) => {
       </div>
     );
   }
-
-  // Intelligent Metric Separation
-  const balanceMetrics = useMemo(() => {
-    return metrics.filter(m => m.includes('BAL') || m.includes('AMT') || m.includes('DRAW') || m.includes('INCA'));
-  }, [metrics]);
-  
-  const rateMetrics = useMemo(() => {
-    return metrics.filter(m => m.includes('INT') || m.includes('NI') || m.includes('OI') || m.includes('RATE'));
-  }, [metrics]);
-
-  const primaryMetric = balanceMetrics.length > 0 ? balanceMetrics[0] : metrics[0];
-  const secondaryMetric = rateMetrics.length > 0 ? rateMetrics[0] : (metrics.length > 1 ? metrics[1] : metrics[0]);
 
   return (
     <>
@@ -159,7 +163,7 @@ const DynamicVisualizer = ({ tableName, title }) => {
                     innerRadius="60%"
                     outerRadius="80%"
                     paddingAngle={2}
-                    dataKey={primaryMetric}
+                    dataKey="_abs_val" // Use absolute value for rendering pie proportions
                     onClick={(entry) => entry.branchCode !== 'ALL' && handleChartClick(entry)}
                     style={{ cursor: 'pointer' }}
                   >
@@ -167,7 +171,7 @@ const DynamicVisualizer = ({ tableName, title }) => {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name) => [formatAmount(value), name]} />
+                  <Tooltip formatter={(value, name, props) => [formatAmount(props.payload[primaryMetric]), props.payload.name]} />
                   <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
                 </PieChart>
               </ResponsiveContainer>

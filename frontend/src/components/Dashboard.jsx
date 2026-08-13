@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud } from 'lucide-react';
 import FilterBar from './FilterBar';
 import SmartModal from './SmartModal';
 import OverviewTab from './OverviewTab';
@@ -8,6 +8,7 @@ import LoanPortfolioTab from './LoanPortfolioTab';
 import DepositsTab from './DepositsTab';
 import ComplianceTab from './ComplianceTab';
 import ReportsTab from './ReportsTab';
+import UploadTab from './UploadTab';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -17,7 +18,7 @@ const Dashboard = () => {
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [selectedPeriod, setSelectedPeriod] = useState('30D');
-  const [exactDate, setExactDate] = useState('2026-08-12');
+  const [exactDate, setExactDate] = useState('2025-04-25');
   
   const [kpiData, setKpiData] = useState({ total_deposits: 428600000000, total_loans: 312400000000, total_npa: 21800000000 });
   const [accountMetrics, setAccountMetrics] = useState({ opened: 14832, closed: 3219 });
@@ -99,6 +100,7 @@ const Dashboard = () => {
             { id: 'deposits', label: 'Deposits', icon: CreditCard },
             { id: 'compliance', label: 'Audit & Exceptions', icon: FileSignature },
             { id: 'reports', label: 'Reports & Accounts', icon: FileText },
+            { id: 'upload', label: 'Data Sync', icon: UploadCloud },
             { id: 'settings', label: 'Settings', icon: Settings },
           ].map(item => (
             <div 
@@ -167,6 +169,7 @@ const Dashboard = () => {
         {activeTab === 'deposits' && <DepositsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
         {activeTab === 'compliance' && <ComplianceTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
         {activeTab === 'reports' && <ReportsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
+        {activeTab === 'upload' && <UploadTab />}
         {activeTab === 'settings' && <PlaceholderTab title="Settings" description="Configure system preferences, user roles, and UI themes." />}
 
       </div>

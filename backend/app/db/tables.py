@@ -2,6 +2,10 @@ from sqlalchemy import Table, Column, String, MetaData, inspect
 from sqlalchemy import delete
 from app.db.database import engine
 
+def check_if_tables_exist(table_names):
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+    return {name: (name in existing_tables) for name in table_names}
 
 def create_table_if_not_exists(table_name, column_names, primary_key_columns=None):
     metadata = MetaData()

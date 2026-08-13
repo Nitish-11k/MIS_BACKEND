@@ -1,7 +1,13 @@
 import os
 import pyodbc
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+import json
+import threading
+import traceback
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from functools import lru_cache
 import shutil
@@ -25,6 +31,199 @@ def get_db_connection():
     database = "ManualMis"
     conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;'
     return pyodbc.connect(conn_str)
+
+# --- UPLOAD ENGINE STATE ---
+upload_state = {
+    "is_running": False,
+    "total_files": 0,
+    "processed_files": 0,
+    "failed_files": 0,
+    "errors": [],
+    "progress_logs": [],
+    "current_file": "",
+    "scan_results": {
+        "existing_tables": [],
+        "new_tables": [],
+        "unsupported_files": []
+    }
+}
+
+def log_upload(message: str, is_error: bool = False):
+    print(message)
+    upload_state["progress_logs"].append({"timestamp": datetime.now().isoformat(), "message": message, "is_error": is_error})
+    # Keep only last 100 logs in memory
+    if len(upload_state["progress_logs"]) > 100:
+        upload_state["progress_logs"].pop(0)
+
+def background_process_folder(base_dir: str):
+    from app.parser.dispatcher import process_file
+    try:
+        upload_state["is_running"] = True
+        upload_state["total_files"] = 0
+        upload_state["processed_files"] = 0
+        upload_state["failed_files"] = 0
+        upload_state["errors"] = []
+        upload_state["progress_logs"] = []
+        
+        log_upload(f"Scanning base directory: {base_dir}")
+        
+        files_to_process = []
+        # Find all files in branch folders
+        if os.path.exists(base_dir):
+            for branch_folder in os.listdir(base_dir):
+                branch_path = os.path.join(base_dir, branch_folder)
+                if os.path.isdir(branch_path) and branch_folder.isdigit():
+                    for f in os.listdir(branch_path):
+                        if f.endswith(".txt") or f.endswith(".txt.gz"):
+                            files_to_process.append(os.path.join(branch_path, f))
+        
+        upload_state["total_files"] = len(files_to_process)
+        log_upload(f"Found {len(files_to_process)} files to process.")
+        
+        for filepath in files_to_process:
+            if not upload_state["is_running"]:
+                log_upload("Upload aborted.")
+                break
+                
+            upload_state["current_file"] = os.path.basename(filepath)
+            
+            try:
+                # Process the file (this automatically creates missing tables as per process_file logic)
+                process_file(filepath)
+                upload_state["processed_files"] += 1
+            except Exception as e:
+                error_msg = f"ERROR parsing {os.path.basename(filepath)}: {str(e)}"
+                log_upload(error_msg, is_error=True)
+                upload_state["errors"].append({"file": os.path.basename(filepath), "error": str(e), "trace": traceback.format_exc()})
+                upload_state["failed_files"] += 1
+                
+        log_upload("Processing complete.")
+    except Exception as e:
+        log_upload(f"FATAL ERROR in upload engine: {str(e)}", is_error=True)
+    finally:
+        upload_state["is_running"] = False
+        upload_state["current_file"] = ""
+
+class UploadRequest(BaseModel):
+    folder_path: str
+
+@app.post("/api/scan-folder")
+def scan_folder(req: UploadRequest):
+    from app.parser.metadata import extract_metadata
+    from app.parser.reader import read_report_lines
+    from app.parser.registry import REGISTRY
+    from app.db.tables import check_if_tables_exist
+    
+    base_dir = req.folder_path
+    if not os.path.exists(base_dir):
+        raise HTTPException(status_code=400, detail="Folder path does not exist on the server.")
+        
+    files_to_process = []
+    if os.path.exists(base_dir):
+        for branch_folder in os.listdir(base_dir):
+            branch_path = os.path.join(base_dir, branch_folder)
+            if os.path.isdir(branch_path) and branch_folder.isdigit():
+                for f in os.listdir(branch_path):
+                    if f.endswith(".txt") or f.endswith(".txt.gz"):
+                        files_to_process.append(os.path.join(branch_path, f))
+    
+    table_names_to_build = set()
+    unsupported_files = set()
+    
+    for filepath in files_to_process:
+        # Read only first 50 lines to extract metadata quickly
+        import gzip
+        lines = []
+        try:
+            if filepath.endswith(".gz"):
+                with gzip.open(filepath, "rt", encoding="utf-8", errors="replace") as f:
+                    for _ in range(50):
+                        line = f.readline()
+                        if not line: break
+                        lines.append(line)
+            else:
+                with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                    for _ in range(50):
+                        line = f.readline()
+                        if not line: break
+                        lines.append(line)
+        except Exception:
+            pass
+            
+        metadata = extract_metadata(lines)
+        report_id = metadata.get("REPORT_ID", "UNKNOWN")
+        
+        if report_id == "UNKNOWN" or report_id not in REGISTRY:
+            base_name = os.path.basename(filepath).lower()
+            for k in REGISTRY.keys():
+                if k.lower() in base_name:
+                    report_id = k
+                    break
+                    
+        if report_id not in REGISTRY:
+            unsupported_files.add(os.path.basename(filepath))
+        else:
+            parser_func = REGISTRY[report_id]
+            table_name = parser_func.__module__.split('.')[-1].upper()
+            table_names_to_build.add(table_name)
+            
+    # Check against database
+    table_status = check_if_tables_exist(list(table_names_to_build))
+    existing = [t for t, exists in table_status.items() if exists]
+    new = [t for t, exists in table_status.items() if not exists]
+    
+    upload_state["scan_results"] = {
+        "existing_tables": existing,
+        "new_tables": new,
+        "unsupported_files": list(unsupported_files)[:100] # Limit to avoid massive payload
+    }
+    
+    return upload_state["scan_results"]
+
+@app.get("/api/browse-folder")
+def browse_server_folder():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        # Create a dummy tk window and hide it
+        root = tk.Tk()
+        root.withdraw()
+        # Bring it to front
+        root.attributes('-topmost', True)
+        
+        folder_path = filedialog.askdirectory(title="Select Date-Wise MIS Folder")
+        root.destroy()
+        
+        return {"folder_path": folder_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/upload-folder")
+def start_upload_folder(req: UploadRequest):
+    if upload_state["is_running"]:
+        raise HTTPException(status_code=400, detail="An upload is already running.")
+    
+    if not os.path.exists(req.folder_path):
+        raise HTTPException(status_code=400, detail="Folder path does not exist on the server.")
+        
+    thread = threading.Thread(target=background_process_folder, args=(req.folder_path,))
+    thread.daemon = True
+    thread.start()
+    return {"message": "Upload processing started in background."}
+
+@app.get("/api/upload-status")
+def get_upload_status():
+    return upload_state
+
+@app.post("/api/upload-stop")
+def stop_upload():
+    if upload_state["is_running"]:
+        upload_state["is_running"] = False
+        return {"message": "Upload stop requested."}
+    return {"message": "No upload is running."}
+
+# --- END UPLOAD ENGINE ---
 
 def get_date_filter_sql(period: str, table_name: str, prefix: str = "WHERE", date_col: str = "PROC_DATE"):
     """Generates SQL condition for filtering by period based on the max date in the table, or by exact date."""
@@ -744,23 +943,23 @@ def get_npa_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
     where_npa, params_npa = get_date_filter_sql(period, "NPA_STMT", "WHERE")
     
     if branch_code != "ALL":
-        where_npa += " AND n.BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE n.BRANCH_CODE = ?"
+        where_npa += " AND NPA_STMT.BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE NPA_STMT.BRANCH_CODE = ?"
         params_npa.append(branch_code)
         
     if "WHERE" in where_npa:
-        where_npa += " AND n.BRANCH_CODE IS NOT NULL AND n.BRANCH_CODE != ''"
+        where_npa += " AND NPA_STMT.BRANCH_CODE IS NOT NULL AND NPA_STMT.BRANCH_CODE != ''"
     else:
-        where_npa = "WHERE n.BRANCH_CODE IS NOT NULL AND n.BRANCH_CODE != ''"
+        where_npa = "WHERE NPA_STMT.BRANCH_CODE IS NOT NULL AND NPA_STMT.BRANCH_CODE != ''"
         
     try:
         cursor.execute(f"""
             SELECT 
-                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = n.BRANCH_CODE), n.BRANCH_CODE) as BRANCH_NAME,
+                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = NPA_STMT.BRANCH_CODE), NPA_STMT.BRANCH_CODE) as BRANCH_NAME,
                 SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa, 
                 SUM(TRY_CAST(INCA AS FLOAT)) as covered
-            FROM NPA_STMT n
+            FROM NPA_STMT
             {where_npa}
-            GROUP BY n.BRANCH_CODE
+            GROUP BY NPA_STMT.BRANCH_CODE
             ORDER BY npa DESC
         """, params_npa)
         rows = cursor.fetchall()
@@ -1113,7 +1312,7 @@ def get_dynamic_data(table_name: str, branch_code: str = 'ALL', page: int = 1, l
 
 
 @app.get('/api/visualize/{table_name}')
-def get_visualize_data(table_name: str):
+def get_visualize_data(table_name: str, branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -1125,7 +1324,17 @@ def get_visualize_data(table_name: str):
         return []
         
     # 2. Sample 1 row to guess numeric columns
-    cursor.execute(f"SELECT TOP 1 * FROM [{table_name.upper()}] WHERE BRANCH_CODE IS NOT NULL")
+    where_clause, params = get_date_filter_sql(period, table_name, "WHERE")
+    if branch_code != "ALL":
+        where_clause += f" AND BRANCH_CODE = ?" if "WHERE" in where_clause else f" WHERE BRANCH_CODE = ?"
+        params.append(branch_code)
+        
+    if "WHERE" in where_clause:
+        where_clause += " AND BRANCH_CODE IS NOT NULL AND BRANCH_CODE != ''"
+    else:
+        where_clause = "WHERE BRANCH_CODE IS NOT NULL AND BRANCH_CODE != ''"
+
+    cursor.execute(f"SELECT TOP 1 * FROM [{table_name.upper()}] {where_clause}", params)
     sample_row = cursor.fetchone()
     
     if not sample_row:
@@ -1162,9 +1371,12 @@ def get_visualize_data(table_name: str):
     # 3. Aggregation Query
     # Use TRY_CAST in SQL Server to avoid crashing on dirty data
     sum_selects = ', '.join([f"SUM(TRY_CAST(REPLACE([{c}], ',', '') AS FLOAT)) as [{c}]" for c in numeric_cols])
-    query = f"SELECT BRANCH_CODE, {sum_selects} FROM [{table_name.upper()}] WHERE BRANCH_CODE IS NOT NULL GROUP BY BRANCH_CODE"
     
-    cursor.execute(query)
+    # If a specific branch is selected, maybe group by PROC_DATE? No, stick to BRANCH_CODE for consistency, or group by both.
+    # The UI DynamicVisualizer maps branchCode to 'name'. We will group by BRANCH_CODE.
+    query = f"SELECT BRANCH_CODE, {sum_selects} FROM [{table_name.upper()}] {where_clause} GROUP BY BRANCH_CODE"
+    
+    cursor.execute(query, params)
     
     result_columns = [column[0] for column in cursor.description]
     rows = []
