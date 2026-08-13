@@ -94,7 +94,7 @@ const DynamicDataGrid = ({ tableName, title, branchCode = 'ALL' }) => {
   };
 
   return (
-    <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '600px' }}>
+    <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div style={{ padding: '20px 24px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#111827' }}>
           {title || tableName.replace(/_/g, ' ')}
@@ -139,6 +139,8 @@ const DynamicDataGrid = ({ tableName, title, branchCode = 'ALL' }) => {
           customStyles={customStyles}
           responsive
           highlightOnHover
+          fixedHeader
+          fixedHeaderScrollHeight="100%"
         />
       </div>
     </div>

@@ -1134,10 +1134,16 @@ def get_visualize_data(table_name: str):
     row_dict = dict(zip(columns, sample_row))
     numeric_cols = []
     
-    exclude_cols = {'ID', 'SR_NO', 'BR_NO', 'ACCT_NO', 'CUST_NO', 'BRANCH_CODE', 'BRANCH_NAME', 'REPORT_ID', 'PROC_DATE'}
+    exclude_exact = {'ID', 'SR_NO', 'BR_NO', 'ACCT_NO', 'CUST_NO', 'BRANCH_CODE', 'BRANCH_NAME', 'REPORT_ID', 'PROC_DATE'}
+    exclude_substrings = ['_ID', 'ID_', 'NO_', '_NO', 'NUMBER', 'CODE', 'ACCT', 'CUST', 'DATE', 'SYS', 'NAME', 'BR_']
     
     for col, val in row_dict.items():
-        if col.upper() in exclude_cols:
+        col_upper = col.upper()
+        if col_upper in exclude_exact:
+            continue
+        if any(sub in col_upper for sub in exclude_substrings):
+            continue
+        if col_upper == 'ID' or col_upper == 'NO':
             continue
         if val is None:
             continue
@@ -1146,9 +1152,6 @@ def get_visualize_data(table_name: str):
             # Handle possible comma formatting in strings
             clean_val = str(val).replace(',', '')
             float(clean_val)
-            # If it didn't throw, it's likely numeric
-            # We don't want to sum things like phone numbers, but exclude_cols catches IDs usually
-            # Also exclude date strings that might accidentally parse, though float() usually fails on '25-OCT'
             numeric_cols.append(col)
         except ValueError:
             pass
