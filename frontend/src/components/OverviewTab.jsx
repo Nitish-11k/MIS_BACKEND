@@ -9,6 +9,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  LabelList
 } from 'recharts';
 import KPICard from './KPICard';
 
@@ -111,7 +112,7 @@ const OverviewTab = ({
         />
 
         <KPICard
-          title="Accounts Opened"
+          title="Opened Accounts"
           value={accountMetrics.opened}
           isCurrency={false}
           changePercent="12.4"
@@ -120,7 +121,7 @@ const OverviewTab = ({
         />
 
         <KPICard
-          title="Accounts Closed"
+          title="Closed Accounts"
           value={accountMetrics.closed}
           isCurrency={false}
           changePercent="4.8"
@@ -282,7 +283,7 @@ const OverviewTab = ({
                   marginTop: '3px',
                 }}
               >
-                {displayNpaData.length} Branches
+                {displayNpaData.length} {displayNpaData.length === 1 ? 'Branch' : 'Branches'}
               </div>
             </div>
 
@@ -329,7 +330,7 @@ const OverviewTab = ({
                   color: '#166534',
                 }}
               >
-                Visible NPA
+                Visible NPA Amount
               </div>
 
               <div
@@ -371,11 +372,11 @@ const OverviewTab = ({
                   layout="vertical"
                   margin={{
                     top: 5,
-                    right: 40,
-                    left: 30,
+                    right: 60,
+                    left: 60,
                     bottom: 5,
                   }}
-                  barGap={2}
+                  barGap={4}
                 >
                   <XAxis
                     type="number"
@@ -419,7 +420,9 @@ const OverviewTab = ({
                     fill="#EF4444"
                     barSize={16}
                     radius={[0, 4, 4, 0]}
-                  />
+                  >
+                    <LabelList dataKey="NPA" position="right" formatter={(val) => `₹${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 })}L`} style={{ fontSize: '11px', fill: '#64748B' }} />
+                  </Bar>
 
                   <Bar
                     dataKey="Covered"
@@ -427,7 +430,9 @@ const OverviewTab = ({
                     fill="#10B981"
                     barSize={16}
                     radius={[0, 4, 4, 0]}
-                  />
+                  >
+                    <LabelList dataKey="Covered" position="right" formatter={(val) => `₹${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 })}L`} style={{ fontSize: '11px', fill: '#64748B' }} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}

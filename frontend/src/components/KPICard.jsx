@@ -1,11 +1,19 @@
 import React from 'react';
 
 const formatAmount = (num) => {
-  if (!num) return '0';
-  if (num >= 10000000) return `₹ ${(num / 10000000).toFixed(0)} Cr`;
-  if (num >= 100000) return `₹ ${(num / 100000).toFixed(0)} L`;
-  if (num >= 1000) return `₹ ${(num / 1000).toFixed(0)} K`;
-  return `₹ ${num.toFixed(0)}`;
+  if (num === null || num === undefined) return '0';
+  const isNegative = num < 0;
+  const absNum = Math.abs(num);
+  
+  let val = '';
+  let suffix = '';
+  
+  if (absNum >= 10000000) { val = (absNum / 10000000).toFixed(2); suffix = ' Cr'; }
+  else if (absNum >= 100000) { val = (absNum / 100000).toFixed(2); suffix = ' L'; }
+  else if (absNum >= 1000) { val = (absNum / 1000).toFixed(2); suffix = ' K'; }
+  else { val = absNum.toFixed(2); suffix = ''; }
+
+  return `₹ ${isNegative ? '-' : ''}${val}${suffix}`;
 };
 
 const KPICard = ({ title, value, isCurrency = true, changePercent, changeType = 'positive', warning = false, onClick, warningText }) => {
@@ -24,6 +32,9 @@ const KPICard = ({ title, value, isCurrency = true, changePercent, changeType = 
         position: 'relative'
       }}
     >
+      <div style={{ fontSize: '14px', color: '#6B7280', fontWeight: '600', marginBottom: '8px' }}>
+        {title}
+      </div>
       <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
         {isCurrency ? formatAmount(value) : (value || 0).toLocaleString()}
       </div>

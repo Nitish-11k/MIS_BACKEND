@@ -18,16 +18,17 @@ const FilterBar = ({
     { id: 3, type: 'info', title: 'System Maintenance', time: '5 hours ago', message: 'Scheduled MIS downtime at 2:00 AM IST on Sunday.' }
   ];
   return (
-    <div className="dashboard-header sticky-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingTop: '20px', paddingBottom: '16px', borderBottom: '1px solid #E5E7EB', background: '#FFFFFF', position: 'sticky', top: 0, zIndex: 100 }}>
+    <div className="dashboard-header sticky-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 32px 16px 32px', borderBottom: '1px solid #E5E7EB', background: '#FFFFFF', position: 'sticky', top: 0, zIndex: 100 }}>
       <div className="header-title-section">
         <h1 className="header-title" style={{ fontSize: '20px', fontWeight: 'bold', margin: '0 0 4px 0', color: '#111827' }}>Banking MIS Dashboard</h1>
-        <p className="header-subtitle" style={{ margin: '0', color: '#6B7280', fontSize: '13px' }}>As of 12 Aug 2026, 14:35 IST</p>
+        <p className="header-subtitle" style={{ margin: '0', color: '#6B7280', fontSize: '13px' }}>Last Updated: 12 Aug 2026, 14:35 IST</p>
       </div>
       
       <div className="header-controls" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         {/* Exact Date Picker */}
         <div className="branch-selector-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F9FAFB', padding: '8px 12px', borderRadius: '8px', border: '1px solid #E5E7EB' }}>
           <Calendar size={16} color="#6B7280" />
+          <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '500' }}>Process Date:</span>
           <input 
             type="date"
             value={exactDate}

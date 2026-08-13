@@ -76,7 +76,7 @@ const Dashboard = () => {
   }, [selectedBranch, selectedPeriod, exactDate]);
 
   return (
-    <div className="app-container" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F3F4F6', fontFamily: 'Inter, sans-serif' }}>
+    <div className="app-container" style={{ display: 'flex', height: '100vh', backgroundColor: '#F3F4F6', fontFamily: 'Inter, sans-serif' }}>
       
       {/* Sidebar - Deep Navy */}
       <div className="sidebar" style={{ flexShrink: 0, width: isSidebarOpen ? '260px' : '80px', transition: 'width 0.3s', backgroundColor: '#111827', color: '#9CA3AF', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
@@ -144,33 +144,33 @@ const Dashboard = () => {
       {/* Main Content Area */}
       <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
-        <div style={{ padding: '0 32px' }}>
-          <FilterBar 
-            branches={branches}
-            selectedBranch={selectedBranch} setSelectedBranch={setSelectedBranch}
-            selectedPeriod={selectedPeriod} setSelectedPeriod={setSelectedPeriod}
-            exactDate={exactDate} setExactDate={setExactDate}
-          />
-        </div>
+        <FilterBar 
+          branches={branches}
+          selectedBranch={selectedBranch} setSelectedBranch={setSelectedBranch}
+          selectedPeriod={selectedPeriod} setSelectedPeriod={setSelectedPeriod}
+          exactDate={exactDate} setExactDate={setExactDate}
+        />
 
-        {activeTab === 'overview' && (
-          <OverviewTab 
-            kpiData={kpiData}
-            accountMetrics={accountMetrics}
-            branchNpaData={branchNpaData}
-            barChartData={barChartData}
-            pieData={pieData}
-            setActiveModal={setActiveModal}
-          />
-        )}
-        
-        {activeTab === 'network' && <PlaceholderTab title="Branch Network" description="Analyze performance and operations across different branch locations." />}
-        {activeTab === 'loans' && <LoanPortfolioTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
-        {activeTab === 'deposits' && <DepositsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
-        {activeTab === 'compliance' && <ComplianceTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
-        {activeTab === 'reports' && <ReportsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
-        {activeTab === 'upload' && <UploadTab />}
-        {activeTab === 'settings' && <PlaceholderTab title="Settings" description="Configure system preferences, user roles, and UI themes." />}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {activeTab === 'overview' && (
+            <OverviewTab 
+              kpiData={kpiData}
+              accountMetrics={accountMetrics}
+              branchNpaData={branchNpaData}
+              barChartData={barChartData}
+              pieData={pieData}
+              setActiveModal={setActiveModal}
+            />
+          )}
+          
+          {activeTab === 'network' && <PlaceholderTab title="Branch Network" description="Analyze performance and operations across different branch locations." />}
+          {activeTab === 'loans' && <LoanPortfolioTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
+          {activeTab === 'deposits' && <DepositsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
+          {activeTab === 'compliance' && <ComplianceTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
+          {activeTab === 'reports' && <ReportsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
+          {activeTab === 'upload' && <UploadTab />}
+          {activeTab === 'settings' && <PlaceholderTab title="Settings" description="Configure system preferences, user roles, and UI themes." />}
+        </div>
 
       </div>
 
