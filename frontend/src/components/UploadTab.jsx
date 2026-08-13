@@ -1,11 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { UploadCloud, FolderSync, AlertTriangle, CheckCircle, Play, Square, FileText, Search, Database, FolderOpen } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  UploadCloud,
+  FolderSync,
+  AlertTriangle,
+  CheckCircle,
+  Play,
+  Square,
+  FileText,
+  Search,
+  Database,
+  FolderOpen,
+  RefreshCw,
+  Clock3,
+  XCircle,
+  Activity,
+  FileCheck2,
+  Table2,
+  Zap,
+} from 'lucide-react';
+
+const API_BASE = 'http://localhost:8000';
 
 const UploadTab = () => {
-  const [folderPath, setFolderPath] = useState('C:\\Users\\dell\\Desktop\\MIS_TOOL\\20250425\\20250425');
-  const [scanState, setScanState] = useState('IDLE'); // IDLE, SCANNING, SCANNED
+  const [folderPath, setFolderPath] = useState(
+    'C:\\Users\\dell\\Desktop\\MIS_TOOL\\20250425\\20250425'
+  );
+
+  const [scanState, setScanState] = useState('IDLE');
+  // IDLE | SCANNING | SCANNED
+
   const [scanResults, setScanResults] = useState(null);
-  
+
   const [status, setStatus] = useState({
     is_running: false,
     total_files: 0,
@@ -13,264 +38,1578 @@ const UploadTab = () => {
     failed_files: 0,
     errors: [],
     progress_logs: [],
-    current_file: ""
+    current_file: '',
   });
-  const [errorMsg, setErrorMsg] = useState("");
-  
+
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
   const logsEndRef = useRef(null);
 
-  const fetchStatus = () => {
-    fetch('http://localhost:8000/api/upload-status')
-      .then(res => res.json())
-      .then(data => {
-        setStatus(data);
-      })
-      .catch(err => console.error("Error fetching status:", err));
+  // ============================================================
+  // FETCH UPLOAD STATUS
+  // ============================================================
+
+  const fetchStatus = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/upload-status`
+      );
+
+      if (!response.ok) {
+        throw new Error('Unable to fetch upload status');
+      }
+
+      const data = await response.json();
+
+      setStatus(data);
+    } catch (error) {
+      console.error(
+        'Error fetching upload status:',
+        error
+      );
+    }
   };
 
-  useEffect(() => {
-    // Poll status every second while running
-    let interval;
-    if (status.is_running) {
-      interval = setInterval(fetchStatus, 1000);
-    } else {
-      // Just fetch once
-      fetchStatus();
-    }
-    return () => clearInterval(interval);
-  }, [status.is_running]);
+  // ============================================================
+  // INITIAL STATUS + POLLING
+  // ============================================================
 
   useEffect(() => {
-    // Auto-scroll logs
+    fetchStatus();
+
+    let interval;
+
+    if (status.is_running) {
+      interval = setInterval(() => {
+        fetchStatus();
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [status.is_running]);
+
+  // ============================================================
+  // AUTO SCROLL LOGS
+  // ============================================================
+
+  useEffect(() => {
     if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+      logsEndRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
     }
   }, [status.progress_logs]);
 
-  const handleBrowse = () => {
-    fetch('http://localhost:8000/api/browse-folder')
-      .then(res => res.json())
-      .then(data => {
-        if (data.folder_path) {
-          setFolderPath(data.folder_path);
-        }
-      })
-      .catch(err => {
-        console.error("Browse error:", err);
-      });
+  // ============================================================
+  // BROWSE FOLDER
+  // ============================================================
+
+  const handleBrowse = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/browse-folder`
+      );
+
+      const data = await response.json();
+
+      if (data.folder_path) {
+        setFolderPath(data.folder_path);
+      }
+    } catch (error) {
+      console.error('Browse error:', error);
+
+      setErrorMsg(
+        'Unable to open folder browser. Please enter the folder path manually.'
+      );
+    }
   };
 
-  const handleScan = () => {
-    setErrorMsg("");
+  // ============================================================
+  // SCAN FOLDER
+  // ============================================================
+
+  const handleScan = async () => {
+    if (!folderPath.trim()) {
+      setErrorMsg(
+        'Please enter a valid folder path before scanning.'
+      );
+      return;
+    }
+
+    setErrorMsg('');
+    setSuccessMsg('');
     setScanState('SCANNING');
     setScanResults(null);
-    
-    fetch('http://localhost:8000/api/scan-folder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folder_path: folderPath })
-    })
-    .then(async (res) => {
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.detail || "Failed to scan folder.");
-        setScanState('IDLE');
-      } else {
-        setScanResults(data);
-        setScanState('SCANNED');
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/scan-folder`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            folder_path: folderPath.trim(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            'Failed to scan folder.'
+        );
       }
-    })
-    .catch(err => {
-      setErrorMsg("Network error contacting scan API.");
+
+      setScanResults(data);
+      setScanState('SCANNED');
+
+      setSuccessMsg(
+        'Folder scanned successfully. Review the scan summary before processing.'
+      );
+    } catch (error) {
+      console.error('Scan error:', error);
+
       setScanState('IDLE');
-      console.error(err);
-    });
+
+      setErrorMsg(
+        error.message ||
+          'Network error while scanning folder.'
+      );
+    }
   };
 
-  const handleStart = () => {
-    setErrorMsg("");
-    fetch('http://localhost:8000/api/upload-folder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folder_path: folderPath })
-    })
-    .then(async (res) => {
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.detail || "Failed to start upload.");
-      } else {
-        fetchStatus();
+  // ============================================================
+  // START UPLOAD / PROCESSING
+  // ============================================================
+
+  const handleStart = async () => {
+    if (!folderPath.trim()) {
+      setErrorMsg(
+        'Please select a folder before starting processing.'
+      );
+      return;
+    }
+
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/upload-folder`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            folder_path: folderPath.trim(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            'Failed to start upload.'
+        );
       }
-    })
-    .catch(err => {
-      setErrorMsg("Network error contacting upload API.");
-      console.error(err);
-    });
+
+      setSuccessMsg(
+        'Data processing started successfully.'
+      );
+
+      await fetchStatus();
+    } catch (error) {
+      console.error(
+        'Upload start error:',
+        error
+      );
+
+      setErrorMsg(
+        error.message ||
+          'Network error while starting upload.'
+      );
+    }
   };
 
-  const handleStop = () => {
-    fetch('http://localhost:8000/api/upload-stop', { method: 'POST' })
-      .then(() => fetchStatus());
+  // ============================================================
+  // STOP UPLOAD
+  // ============================================================
+
+  const handleStop = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      await fetch(
+        `${API_BASE}/api/upload-stop`,
+        {
+          method: 'POST',
+        }
+      );
+
+      setSuccessMsg(
+        'Processing stop request sent.'
+      );
+
+      await fetchStatus();
+    } catch (error) {
+      console.error(
+        'Stop upload error:',
+        error
+      );
+
+      setErrorMsg(
+        'Unable to stop the processing job.'
+      );
+    }
   };
 
-  const percent = status.total_files > 0 
-    ? Math.round(((status.processed_files + status.failed_files) / status.total_files) * 100) 
-    : 0;
+  // ============================================================
+  // RESET SCAN
+  // ============================================================
+
+  const handleResetScan = () => {
+    if (status.is_running) {
+      return;
+    }
+
+    setScanState('IDLE');
+    setScanResults(null);
+    setErrorMsg('');
+    setSuccessMsg('');
+  };
+
+  // ============================================================
+  // CALCULATIONS
+  // ============================================================
+
+  const totalFiles =
+    Number(status.total_files) || 0;
+
+  const processedFiles =
+    Number(status.processed_files) || 0;
+
+  const failedFiles =
+    Number(status.failed_files) || 0;
+
+  const completedFiles =
+    processedFiles + failedFiles;
+
+  const percent =
+    totalFiles > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (completedFiles / totalFiles) *
+              100
+          )
+        )
+      : 0;
+
+  const isRunning = Boolean(
+    status.is_running
+  );
+
+  const isScanning =
+    scanState === 'SCANNING';
+
+  const isScanned =
+    scanState === 'SCANNED';
+
+  const existingTables =
+    scanResults?.existing_tables || [];
+
+  const newTables =
+    scanResults?.new_tables || [];
+
+  const unsupportedFiles =
+    scanResults?.unsupported_files || [];
+
+  const progressLogs =
+    Array.isArray(status.progress_logs)
+      ? status.progress_logs
+      : [];
+
+  // ============================================================
+  // STATUS TEXT
+  // ============================================================
+
+  let statusText = 'Ready';
+  let statusColor = '#64748B';
+  let statusBackground = '#F8FAFC';
+  let statusIcon = <Clock3 size={18} />;
+
+  if (isScanning) {
+    statusText = 'Scanning';
+    statusColor = '#2563EB';
+    statusBackground = '#EFF6FF';
+    statusIcon = (
+      <RefreshCw
+        size={18}
+        className="animate-spin"
+      />
+    );
+  } else if (isRunning) {
+    statusText = 'Processing';
+    statusColor = '#2563EB';
+    statusBackground = '#EFF6FF';
+    statusIcon = (
+      <Activity size={18} />
+    );
+  } else if (
+    totalFiles > 0 &&
+    percent === 100 &&
+    failedFiles === 0
+  ) {
+    statusText = 'Completed';
+    statusColor = '#15803D';
+    statusBackground = '#F0FDF4';
+    statusIcon = (
+      <CheckCircle size={18} />
+    );
+  } else if (
+    totalFiles > 0 &&
+    percent === 100 &&
+    failedFiles > 0
+  ) {
+    statusText = 'Completed with Errors';
+    statusColor = '#B45309';
+    statusBackground = '#FFFBEB';
+    statusIcon = (
+      <AlertTriangle size={18} />
+    );
+  }
+
+  // ============================================================
+  // SMALL REUSABLE COMPONENTS
+  // ============================================================
+
+  const MetricCard = ({
+    label,
+    value,
+    icon,
+    background,
+    border,
+    valueColor,
+    labelColor,
+  }) => (
+    <div
+      style={{
+        background,
+        border: `1px solid ${border}`,
+        borderRadius: '12px',
+        padding: '18px',
+        minHeight: '105px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: '700',
+            color: labelColor,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {label}
+        </span>
+
+        <div
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#FFFFFF',
+            border: `1px solid ${border}`,
+            color: valueColor,
+          }}
+        >
+          {icon}
+        </div>
+      </div>
+
+      <div
+        style={{
+          fontSize: '27px',
+          lineHeight: 1,
+          fontWeight: '700',
+          color: valueColor,
+        }}
+      >
+        {value.toLocaleString('en-IN')}
+      </div>
+    </div>
+  );
+
+  const ResultCard = ({
+    title,
+    count,
+    icon,
+    color,
+    background,
+    border,
+    items,
+    emptyText,
+  }) => (
+    <div
+      style={{
+        background: '#FFFFFF',
+        border: `1px solid ${border}`,
+        borderRadius: '10px',
+        padding: '16px',
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '12px',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color,
+            fontSize: '13px',
+            fontWeight: '700',
+          }}
+        >
+          {icon}
+          {title}
+        </div>
+
+        <div
+          style={{
+            minWidth: '28px',
+            height: '28px',
+            padding: '0 8px',
+            borderRadius: '14px',
+            background,
+            color,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            fontWeight: '700',
+          }}
+        >
+          {count}
+        </div>
+      </div>
+
+      <div
+        style={{
+          maxHeight: '115px',
+          overflowY: 'auto',
+          fontSize: '12px',
+          color: '#475569',
+          lineHeight: 1.7,
+        }}
+      >
+        {items.length > 0 ? (
+          items.map((item, index) => (
+            <div
+              key={`${item}-${index}`}
+              style={{
+                padding: '4px 0',
+                borderBottom:
+                  index === items.length - 1
+                    ? 'none'
+                    : '1px solid #F1F5F9',
+                wordBreak: 'break-word',
+              }}
+            >
+              {item}
+            </div>
+          ))
+        ) : (
+          <div
+            style={{
+              color: '#94A3B8',
+              padding: '10px 0',
+            }}
+          >
+            {emptyText}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <FolderSync size={28} color="#3B82F6" /> Advanced Upload Engine
-          </h1>
-          <p style={{ color: '#6B7280', marginTop: '8px' }}>
-            Directly process gigabytes of raw date-wise branch folders. Paste the absolute server folder path below.
-          </p>
-        </div>
-      </div>
+    <div
+      style={{
+        height: '100%',
+        overflowY: 'auto',
+        padding: '24px 32px',
+        background: '#F8FAFC',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '1600px',
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+        }}
+      >
+        {/* ======================================================
+            PAGE HEADER
+        ====================================================== */}
 
-      <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '24px' }}>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-              Absolute Folder Path (e.g., C:\Users\dell\Desktop\MIS_TOOL\20250425\20250425)
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input 
-                type="text" 
-                value={folderPath}
-                onChange={(e) => setFolderPath(e.target.value)}
-                disabled={status.is_running}
-                style={{ flex: 1, padding: '10px 14px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '15px' }}
-              />
-              <button
-                onClick={handleBrowse}
-                disabled={status.is_running}
-                style={{ background: '#F1F5F9', color: '#334155', border: '1px solid #CBD5E1', padding: '0 16px', borderRadius: '6px', fontWeight: '500', cursor: status.is_running ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '20px',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: '#EFF6FF',
+                  color: '#2563EB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <FolderOpen size={16} /> Browse
-              </button>
+                <UploadCloud size={22} />
+              </div>
+
+              <div>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: '22px',
+                    lineHeight: 1.2,
+                    fontWeight: '700',
+                    color: '#0F172A',
+                  }}
+                >
+                  Upload Data
+                </h1>
+
+                <p
+                  style={{
+                    margin:
+                      '5px 0 0 0',
+                    fontSize: '13px',
+                    color: '#64748B',
+                  }}
+                >
+                  Import and process branch-wise
+                  MIS reports into the database.
+                </p>
+              </div>
             </div>
           </div>
-          
-          {!status.is_running && scanState !== 'SCANNED' ? (
-            <button 
-              onClick={handleScan}
-              disabled={scanState === 'SCANNING'}
-              style={{ background: '#3B82F6', color: '#fff', padding: '10px 24px', borderRadius: '6px', border: 'none', fontWeight: '600', cursor: scanState === 'SCANNING' ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', opacity: scanState === 'SCANNING' ? 0.7 : 1 }}
+
+          {/* Current Status */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 13px',
+              borderRadius: '20px',
+              background: statusBackground,
+              color: statusColor,
+              border: `1px solid ${
+                statusColor
+              }22`,
+              fontSize: '12px',
+              fontWeight: '700',
+            }}
+          >
+            {statusIcon}
+            {statusText}
+          </div>
+        </div>
+
+        {/* ======================================================
+            SOURCE / FOLDER CARD
+        ====================================================== */}
+
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+            padding: '22px',
+            boxShadow:
+              '0 1px 3px rgba(15, 23, 42, 0.04)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '9px',
+              marginBottom: '18px',
+            }}
+          >
+            <FolderSync
+              size={18}
+              color="#2563EB"
+            />
+
+            <div>
+              <div
+                style={{
+                  fontSize: '15px',
+                  fontWeight: '700',
+                  color: '#0F172A',
+                }}
+              >
+                Select Data Source
+              </div>
+
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#64748B',
+                  marginTop: '3px',
+                }}
+              >
+                Select the folder containing
+                date-wise branch report files.
+              </div>
+            </div>
+          </div>
+
+          <label
+            style={{
+              display: 'block',
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#334155',
+              marginBottom: '7px',
+            }}
+          >
+            Source Folder
+          </label>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: '10px',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                flex: 1,
+                position: 'relative',
+              }}
             >
-              <Search size={18} /> {scanState === 'SCANNING' ? 'Scanning...' : 'Scan Folder'}
-            </button>
-          ) : (
-            <button 
-              onClick={handleStop}
-              style={{ background: '#EF4444', color: '#fff', padding: '10px 24px', borderRadius: '6px', border: 'none', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px' }}
+              <FolderOpen
+                size={17}
+                color="#94A3B8"
+                style={{
+                  position: 'absolute',
+                  left: '13px',
+                  top: '12px',
+                }}
+              />
+
+              <input
+                type="text"
+                value={folderPath}
+                onChange={(e) =>
+                  setFolderPath(
+                    e.target.value
+                  )
+                }
+                disabled={
+                  isRunning ||
+                  isScanning
+                }
+                placeholder="Enter absolute folder path..."
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding:
+                    '11px 14px 11px 40px',
+                  border:
+                    '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  fontSize: '13px',
+                  color: '#0F172A',
+                  background:
+                    isRunning ||
+                    isScanning
+                      ? '#F8FAFC'
+                      : '#FFFFFF',
+                }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleBrowse}
+              disabled={
+                isRunning ||
+                isScanning
+              }
+              style={{
+                height: '42px',
+                padding: '0 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '7px',
+                borderRadius: '8px',
+                border:
+                  '1px solid #CBD5E1',
+                background: '#FFFFFF',
+                color: '#334155',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor:
+                  isRunning ||
+                  isScanning
+                    ? 'not-allowed'
+                    : 'pointer',
+                opacity:
+                  isRunning ||
+                  isScanning
+                    ? 0.6
+                    : 1,
+              }}
             >
-              <Square size={18} /> Stop
+              <FolderOpen size={16} />
+              Browse
             </button>
+
+            {!isRunning ? (
+              <button
+                type="button"
+                onClick={handleScan}
+                disabled={isScanning}
+                style={{
+                  height: '42px',
+                  padding: '0 19px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '7px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#2563EB',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: isScanning
+                    ? 'not-allowed'
+                    : 'pointer',
+                  opacity: isScanning
+                    ? 0.7
+                    : 1,
+                  boxShadow:
+                    '0 2px 5px rgba(37, 99, 235, 0.20)',
+                }}
+              >
+                {isScanning ? (
+                  <RefreshCw
+                    size={16}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <Search size={16} />
+                )}
+
+                {isScanning
+                  ? 'Scanning...'
+                  : 'Scan Folder'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStop}
+                style={{
+                  height: '42px',
+                  padding: '0 19px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '7px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                }}
+              >
+                <Square size={15} />
+                Stop
+              </button>
+            )}
+          </div>
+
+          {/* Helper text */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginTop: '9px',
+              fontSize: '11px',
+              color: '#94A3B8',
+            }}
+          >
+            <FileText size={13} />
+
+            Example:
+            C:\MIS_TOOL\20250425\20250425
+          </div>
+
+          {/* Error */}
+          {errorMsg && (
+            <div
+              style={{
+                marginTop: '14px',
+                padding: '11px 13px',
+                borderRadius: '8px',
+                background: '#FEF2F2',
+                border:
+                  '1px solid #FECACA',
+                color: '#B91C1C',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                fontSize: '12px',
+                lineHeight: 1.5,
+              }}
+            >
+              <AlertTriangle
+                size={16}
+                style={{
+                  flexShrink: 0,
+                  marginTop: '1px',
+                }}
+              />
+
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Success */}
+          {successMsg && (
+            <div
+              style={{
+                marginTop: '14px',
+                padding: '11px 13px',
+                borderRadius: '8px',
+                background: '#F0FDF4',
+                border:
+                  '1px solid #BBF7D0',
+                color: '#15803D',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+              }}
+            >
+              <CheckCircle size={16} />
+
+              <span>{successMsg}</span>
+            </div>
           )}
         </div>
-        {errorMsg && <p style={{ color: '#EF4444', fontSize: '14px', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={16} /> {errorMsg}</p>}
-      </div>
 
-      {/* Scan Results Panel */}
-      {scanState === 'SCANNED' && scanResults && !status.is_running && (
-        <div className="card" style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #CBD5E1', padding: '24px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0F172A', marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Database size={20} color="#3B82F6" /> Scan Summary & Approval
-          </h2>
-          
-          <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-            <div style={{ flex: 1, background: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '16px' }}>
-              <div style={{ color: '#16A34A', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckCircle size={16} /> Existing Tables ({scanResults.existing_tables?.length})
+        {/* ======================================================
+            METRICS
+        ====================================================== */}
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              'repeat(4, minmax(0, 1fr))',
+            gap: '14px',
+          }}
+        >
+          <MetricCard
+            label="Total Files"
+            value={totalFiles}
+            icon={
+              <FileText size={17} />
+            }
+            background="#EFF6FF"
+            border="#BFDBFE"
+            valueColor="#1D4ED8"
+            labelColor="#2563EB"
+          />
+
+          <MetricCard
+            label="Processed OK"
+            value={processedFiles}
+            icon={
+              <FileCheck2 size={17} />
+            }
+            background="#F0FDF4"
+            border="#BBF7D0"
+            valueColor="#15803D"
+            labelColor="#16A34A"
+          />
+
+          <MetricCard
+            label="Failed / Skipped"
+            value={failedFiles}
+            icon={
+              <XCircle size={17} />
+            }
+            background="#FEF2F2"
+            border="#FECACA"
+            valueColor="#B91C1C"
+            labelColor="#DC2626"
+          />
+
+          <MetricCard
+            label="Completion"
+            value={percent}
+            icon={
+              <Activity size={17} />
+            }
+            background="#F8FAFC"
+            border="#E2E8F0"
+            valueColor="#334155"
+            labelColor="#64748B"
+          />
+        </div>
+
+        {/* ======================================================
+            SCAN SUMMARY
+        ====================================================== */}
+
+        {isScanned &&
+          scanResults &&
+          !isRunning && (
+            <div
+              style={{
+                background: '#FFFFFF',
+                border:
+                  '1px solid #E2E8F0',
+                borderRadius: '12px',
+                padding: '22px',
+                boxShadow:
+                  '0 1px 3px rgba(15, 23, 42, 0.04)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent:
+                    'space-between',
+                  alignItems: 'center',
+                  gap: '15px',
+                  marginBottom: '18px',
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '15px',
+                      fontWeight: '700',
+                      color: '#0F172A',
+                    }}
+                  >
+                    <Database
+                      size={18}
+                      color="#2563EB"
+                    />
+                    Scan Summary
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: '4px',
+                      fontSize: '12px',
+                      color: '#64748B',
+                    }}
+                  >
+                    Review detected data before
+                    starting the import process.
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding:
+                      '6px 10px',
+                    borderRadius: '16px',
+                    background:
+                      '#F0FDF4',
+                    color: '#15803D',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  <CheckCircle size={13} />
+                  Scan Complete
+                </div>
               </div>
-              <div style={{ fontSize: '13px', color: '#475569', maxHeight: '100px', overflowY: 'auto' }}>
-                {scanResults.existing_tables?.length > 0 ? scanResults.existing_tables.join(', ') : 'None'}
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(3, minmax(0, 1fr))',
+                  gap: '14px',
+                }}
+              >
+                <ResultCard
+                  title="Existing Tables"
+                  count={
+                    existingTables.length
+                  }
+                  icon={
+                    <Table2 size={16} />
+                  }
+                  color="#15803D"
+                  background="#F0FDF4"
+                  border="#BBF7D0"
+                  items={
+                    existingTables
+                  }
+                  emptyText="No existing tables found."
+                />
+
+                <ResultCard
+                  title="New Tables"
+                  count={
+                    newTables.length
+                  }
+                  icon={
+                    <Zap size={16} />
+                  }
+                  color="#B45309"
+                  background="#FFFBEB"
+                  border="#FDE68A"
+                  items={newTables}
+                  emptyText="No new tables required."
+                />
+
+                <ResultCard
+                  title="Unsupported Files"
+                  count={
+                    unsupportedFiles.length
+                  }
+                  icon={
+                    <AlertTriangle
+                      size={16}
+                    />
+                  }
+                  color="#B91C1C"
+                  background="#FEF2F2"
+                  border="#FECACA"
+                  items={
+                    unsupportedFiles
+                  }
+                  emptyText="No unsupported files."
+                />
+              </div>
+
+              {/* Approval Actions */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent:
+                    'flex-end',
+                  alignItems: 'center',
+                  gap: '10px',
+                  marginTop: '18px',
+                  paddingTop: '18px',
+                  borderTop:
+                    '1px solid #E2E8F0',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={
+                    handleResetScan
+                  }
+                  style={{
+                    height: '38px',
+                    padding:
+                      '0 15px',
+                    borderRadius: '7px',
+                    border:
+                      '1px solid #CBD5E1',
+                    background:
+                      '#FFFFFF',
+                    color: '#475569',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    handleStart
+                  }
+                  style={{
+                    height: '38px',
+                    padding:
+                      '0 17px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    background:
+                      '#10B981',
+                    color: '#FFFFFF',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                  }}
+                >
+                  <Play size={15} />
+                  Approve & Start Processing
+                </button>
               </div>
             </div>
-            
-            <div style={{ flex: 1, background: '#fff', border: '1px solid #FDE047', borderRadius: '8px', padding: '16px' }}>
-              <div style={{ color: '#CA8A04', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <AlertTriangle size={16} /> New Tables to Build ({scanResults.new_tables?.length})
+          )}
+
+        {/* ======================================================
+            PROCESSING PROGRESS
+        ====================================================== */}
+
+        <div
+          style={{
+            background: '#FFFFFF',
+            border:
+              '1px solid #E2E8F0',
+            borderRadius: '12px',
+            padding: '22px',
+            boxShadow:
+              '0 1px 3px rgba(15, 23, 42, 0.04)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent:
+                'space-between',
+              alignItems: 'flex-start',
+              gap: '20px',
+              marginBottom: '13px',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '15px',
+                  fontWeight: '700',
+                  color: '#0F172A',
+                }}
+              >
+                <Activity
+                  size={18}
+                  color="#2563EB"
+                />
+                Processing Progress
               </div>
-              <div style={{ fontSize: '13px', color: '#475569', maxHeight: '100px', overflowY: 'auto' }}>
-                {scanResults.new_tables?.length > 0 ? scanResults.new_tables.join(', ') : 'None'}
+
+              <div
+                style={{
+                  marginTop: '4px',
+                  fontSize: '12px',
+                  color: '#64748B',
+                }}
+              >
+                {status.current_file
+                  ? `Processing: ${status.current_file}`
+                  : 'No file is currently being processed.'}
               </div>
             </div>
-            
-            <div style={{ flex: 1, background: '#fff', border: '1px solid #FECACA', borderRadius: '8px', padding: '16px' }}>
-              <div style={{ color: '#DC2626', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <FileText size={16} /> Unsupported Files ({scanResults.unsupported_files?.length})
-              </div>
-              <div style={{ fontSize: '13px', color: '#475569', maxHeight: '100px', overflowY: 'auto' }}>
-                {scanResults.unsupported_files?.length > 0 ? scanResults.unsupported_files.join(', ') : 'None'}
-              </div>
+
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: '700',
+                color: '#0F172A',
+              }}
+            >
+              {percent}%
             </div>
           </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button onClick={() => setScanState('IDLE')} style={{ background: '#E2E8F0', color: '#334155', padding: '10px 20px', borderRadius: '6px', border: 'none', fontWeight: '500', cursor: 'pointer' }}>
-              Cancel
-            </button>
-            <button onClick={handleStart} style={{ background: '#10B981', color: '#fff', padding: '10px 24px', borderRadius: '6px', border: 'none', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle size={18} /> Approve & Build
-            </button>
+
+          {/* Progress Bar */}
+          <div
+            style={{
+              width: '100%',
+              height: '10px',
+              background: '#E2E8F0',
+              borderRadius: '999px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${percent}%`,
+                height: '100%',
+                background:
+                  percent === 100
+                    ? '#10B981'
+                    : '#2563EB',
+                borderRadius: '999px',
+                transition:
+                  'width 0.35s ease',
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent:
+                'space-between',
+              marginTop: '9px',
+              fontSize: '11px',
+              color: '#64748B',
+            }}
+          >
+            <span>
+              {completedFiles.toLocaleString(
+                'en-IN'
+              )}{' '}
+              of{' '}
+              {totalFiles.toLocaleString(
+                'en-IN'
+              )}{' '}
+              files completed
+            </span>
+
+            <span>
+              {failedFiles > 0
+                ? `${failedFiles} failed/skipped`
+                : 'No failures'}
+            </span>
           </div>
         </div>
-      )}
 
-      {/* Progress & Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-        <div style={{ background: '#F0F9FF', padding: '20px', borderRadius: '12px', border: '1px solid #BAE6FD' }}>
-          <div style={{ fontSize: '13px', color: '#0284C7', fontWeight: '600', textTransform: 'uppercase' }}>Total Files</div>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#0369A1', marginTop: '4px' }}>{status.total_files}</div>
-        </div>
-        <div style={{ background: '#F0FDF4', padding: '20px', borderRadius: '12px', border: '1px solid #BBF7D0' }}>
-          <div style={{ fontSize: '13px', color: '#16A34A', fontWeight: '600', textTransform: 'uppercase' }}>Processed OK</div>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#15803D', marginTop: '4px' }}>{status.processed_files}</div>
-        </div>
-        <div style={{ background: '#FEF2F2', padding: '20px', borderRadius: '12px', border: '1px solid #FECACA' }}>
-          <div style={{ fontSize: '13px', color: '#DC2626', fontWeight: '600', textTransform: 'uppercase' }}>Failed / Skipped</div>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#B91C1C', marginTop: '4px' }}>{status.failed_files}</div>
-        </div>
-        <div style={{ background: '#F8FAFC', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-          <div style={{ fontSize: '13px', color: '#475569', fontWeight: '600', textTransform: 'uppercase' }}>Status</div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold', color: status.is_running ? '#3B82F6' : '#64748B', marginTop: '8px' }}>
-            {status.is_running ? 'Running...' : 'Idle'}
-          </div>
-        </div>
-      </div>
+        {/* ======================================================
+            LIVE ACTIVITY
+        ====================================================== */}
 
-      {/* Progress Bar */}
-      <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>
-          <span>Overall Progress {status.current_file && `(Processing: ${status.current_file})`}</span>
-          <span>{percent}%</span>
-        </div>
-        <div style={{ width: '100%', background: '#F1F5F9', borderRadius: '999px', height: '12px', overflow: 'hidden' }}>
-          <div style={{ width: `${percent}%`, background: '#3B82F6', height: '100%', transition: 'width 0.3s ease' }}></div>
-        </div>
-      </div>
+        <div
+          style={{
+            background: '#FFFFFF',
+            border:
+              '1px solid #E2E8F0',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow:
+              '0 1px 3px rgba(15, 23, 42, 0.04)',
+            minHeight: '310px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Console Header */}
+          <div
+            style={{
+              padding:
+                '15px 20px',
+              borderBottom:
+                '1px solid #E2E8F0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent:
+                'space-between',
+              background: '#F8FAFC',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '9px',
+              }}
+            >
+              <div
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '7px',
+                  background:
+                    '#EFF6FF',
+                  color: '#2563EB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent:
+                    'center',
+                }}
+              >
+                <FileText
+                  size={16}
+                />
+              </div>
 
-      {/* Live Terminal */}
-      <div className="card" style={{ background: '#1E293B', borderRadius: '12px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: '300px' }}>
-        <div style={{ background: '#0F172A', padding: '12px 20px', borderBottom: '1px solid #334155', color: '#94A3B8', fontSize: '13px', fontWeight: '600', display: 'flex', justifyContent: 'space-between' }}>
-          <span>LIVE CONSOLE</span>
-          <span>{status.progress_logs.length} Lines</span>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', fontFamily: 'monospace', fontSize: '13px', color: '#E2E8F0' }}>
-          {status.progress_logs.map((log, idx) => (
-            <div key={idx} style={{ marginBottom: '6px', color: log.is_error ? '#FCA5A5' : '#E2E8F0', display: 'flex', gap: '12px' }}>
-              <span style={{ color: '#64748B' }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-              <span>
-                {log.is_error && <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '4px' }} />}
-                {log.message}
-              </span>
+              <div>
+                <div
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    color: '#0F172A',
+                  }}
+                >
+                  Processing Activity
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: '#64748B',
+                    marginTop: '2px',
+                  }}
+                >
+                  Live upload and processing
+                  events
+                </div>
+              </div>
             </div>
-          ))}
-          <div ref={logsEndRef} />
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '11px',
+                color: '#64748B',
+              }}
+            >
+              <span
+                style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  background:
+                    isRunning
+                      ? '#22C55E'
+                      : '#94A3B8',
+                }}
+              />
+
+              {progressLogs.length}{' '}
+              events
+            </div>
+          </div>
+
+          {/* Logs */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '14px 20px',
+              background: '#FFFFFF',
+              minHeight: '245px',
+              maxHeight: '360px',
+            }}
+          >
+            {progressLogs.length ===
+            0 ? (
+              <div
+                style={{
+                  height: '220px',
+                  display: 'flex',
+                  flexDirection:
+                    'column',
+                  alignItems:
+                    'center',
+                  justifyContent:
+                    'center',
+                  color: '#94A3B8',
+                  gap: '8px',
+                }}
+              >
+                <Activity
+                  size={28}
+                />
+
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                  }}
+                >
+                  No processing activity
+                  yet
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '11px',
+                  }}
+                >
+                  Logs will appear here
+                  when processing starts.
+                </div>
+              </div>
+            ) : (
+              progressLogs.map(
+                (log, index) => {
+                  const isError =
+                    Boolean(
+                      log?.is_error
+                    );
+
+                  return (
+                    <div
+                      key={`${log?.timestamp || index}-${index}`}
+                      style={{
+                        display: 'flex',
+                        alignItems:
+                          'flex-start',
+                        gap: '10px',
+                        padding:
+                          '8px 0',
+                        borderBottom:
+                          index ===
+                          progressLogs.length -
+                            1
+                            ? 'none'
+                            : '1px solid #F1F5F9',
+                      }}
+                    >
+                      <div
+                        style={{
+                          marginTop:
+                            '2px',
+                          flexShrink: 0,
+                          color: isError
+                            ? '#DC2626'
+                            : '#16A34A',
+                        }}
+                      >
+                        {isError ? (
+                          <AlertTriangle
+                            size={14}
+                          />
+                        ) : (
+                          <CheckCircle
+                            size={14}
+                          />
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          minWidth: 0,
+                          flex: 1,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize:
+                              '12px',
+                            lineHeight:
+                              1.5,
+                            color:
+                              isError
+                                ? '#B91C1C'
+                                : '#334155',
+                            wordBreak:
+                              'break-word',
+                          }}
+                        >
+                          {log?.message ||
+                            'Processing event'}
+                        </div>
+
+                        {log?.timestamp && (
+                          <div
+                            style={{
+                              fontSize:
+                                '10px',
+                              color:
+                                '#94A3B8',
+                              marginTop:
+                                '3px',
+                            }}
+                          >
+                            {new Date(
+                              log.timestamp
+                            ).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+              )
+            )}
+
+            <div
+              ref={logsEndRef}
+            />
+          </div>
         </div>
       </div>
     </div>

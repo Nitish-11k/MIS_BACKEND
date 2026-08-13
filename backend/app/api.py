@@ -355,89 +355,328 @@ def get_closed_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
 
 @app.get("/api/deposit-branch-wise")
 @lru_cache(maxsize=128)
-def get_deposit_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
+def get_deposit_branch_wise(
+    branch_code: str = "ALL",
+    period: str = "ALL"
+):
+    """
+    Branch-wise deposit balance.
+
+    Source:
+        DEPOSITS_BALANCE_FILE_DEPD0586
+
+    Amount:
+        CURRENT_BALANCE
+
+    Duplicate protection:
+        One latest row per BRANCH_CODE + ACCOUNT_NUMBER.
+    """
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    where_dep, params_dep = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
-    
-    if branch_code != "ALL":
-        where_dep += " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
-        params_dep.append(branch_code)
-        
+
     try:
-        cursor.execute(f"""
-            SELECT BRANCH_NAME, SUM(TRY_CAST(CURRENT_BALANCE AS FLOAT)) as deposits
-            FROM DEPOSITS_BALANCE_FILE_DEPD0586
-            {where_dep}
-            GROUP BY BRANCH_NAME
-            ORDER BY deposits DESC
-        """, params_dep)
-        
+        where_dep, params_dep = get_date_filter_sql(
+            period,
+            "DEPOSITS_BALANCE_FILE_DEPD0586"
+        )
+
+        branch_condition = ""
+
+        if branch_code != "ALL":
+            branch_condition = " AND BRANCH_CODE = ?"
+            params_dep.append(branch_code)
+
+        query = f"""
+            WITH LatestAccounts AS (
+                SELECT
+                    ID,
+                    ACCOUNT_NUMBER,
+                    BRANCH_CODE,
+                    BRANCH_NAME,
+                    CURRENT_BALANCE,
+
+                    ROW_NUMBER() OVER (
+                        PARTITION BY
+                            BRANCH_CODE,
+                            ACCOUNT_NUMBER
+                        ORDER BY ID DESC
+                    ) AS rn
+
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_dep}
+                {branch_condition}
+            )
+
+            SELECT
+                BRANCH_CODE,
+                BRANCH_NAME,
+
+                SUM(
+                    TRY_CAST(
+                        REPLACE(
+                            ISNULL(CURRENT_BALANCE, '0'),
+                            ',',
+                            ''
+                        ) AS FLOAT
+                    )
+                ) AS TOTAL_DEPOSITS,
+
+                COUNT(*) AS ACCOUNT_COUNT
+
+            FROM LatestAccounts
+
+            WHERE rn = 1
+
+            GROUP BY
+                BRANCH_CODE,
+                BRANCH_NAME
+
+            ORDER BY TOTAL_DEPOSITS DESC
+        """
+
+        cursor.execute(query, params_dep)
+
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": abs(r[1] or 0)} for r in rows]
+
+        data = []
+
+        for row in rows:
+            data.append(
+                {
+                    "branch_code": str(row[0]).strip()
+                    if row[0] is not None
+                    else "",
+
+                    "name": (
+                        str(row[1]).strip()
+                        if row[1]
+                        else "Unknown"
+                    ),
+
+                    # IMPORTANT:
+                    # SmartModal expects `value`.
+                    "value": float(row[2])
+                    if row[2] is not None
+                    else 0.0,
+
+                    "account_count": int(row[3])
+                    if row[3] is not None
+                    else 0,
+                }
+            )
+
+        return data
+
     except Exception as e:
         print(f"Error calculating branch-wise deposits: {e}")
-        data = []
-        
-    conn.close()
-    return data
+        return []
+
+    finally:
+        conn.close()
+
+
 
 @app.get("/api/kpi-summary")
 @lru_cache(maxsize=128)
 def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL"):
+    """
+    KPI summary.
+
+    Deposit calculation:
+    - Uses DEPOSITS_BALANCE_FILE_DEPD0586
+    - Uses CURRENT_BALANCE
+    - Applies selected branch
+    - Applies selected exact date / period
+    - Prevents duplicate account rows from inflating the total
+    - Does NOT use ABS(SUM(...))
+    """
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     data = {
         "total_deposits": 0,
         "total_loans": 0,
         "total_npa": 0,
-        "branches_reporting": 0
+        "branches_reporting": 0,
     }
-    
+
     try:
-        # Total Deposits
-        where_dep, params_dep = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
+        # =========================================================
+        # DEPOSITS
+        # =========================================================
+        where_dep, params_dep = get_date_filter_sql(
+            period,
+            "DEPOSITS_BALANCE_FILE_DEPD0586"
+        )
+
+        branch_condition = ""
         if branch_code != "ALL":
-            where_dep += " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
+            branch_condition = " AND BRANCH_CODE = ?"
             params_dep.append(branch_code)
-        cursor.execute(f"SELECT SUM(TRY_CAST(CURRENT_BALANCE AS FLOAT)) FROM DEPOSITS_BALANCE_FILE_DEPD0586 {where_dep}", params_dep)
-        res = cursor.fetchone()
-        if res and res[0]: data["total_deposits"] = abs(res[0])
-        
-        # Total Loans
-        where_loan, params_loan = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET")
+
+        # We first select one record per ACCOUNT_NUMBER.
+        #
+        # This protects the KPI from duplicate account rows in the
+        # imported report.
+        #
+        # ID is the internal auto-increment ID generated by the
+        # ingestion layer and gives us deterministic latest-row
+        # selection when duplicates exist.
+        deposit_sql = f"""
+            WITH LatestAccounts AS (
+                SELECT
+                    ID,
+                    ACCOUNT_NUMBER,
+                    BRANCH_CODE,
+                    BRANCH_NAME,
+                    PROC_DATE,
+                    CURRENT_BALANCE,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY
+                            BRANCH_CODE,
+                            ACCOUNT_NUMBER
+                        ORDER BY ID DESC
+                    ) AS rn
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_dep}
+                {branch_condition}
+            )
+            SELECT
+                SUM(
+                    TRY_CAST(
+                        REPLACE(
+                            ISNULL(CURRENT_BALANCE, '0'),
+                            ',',
+                            ''
+                        ) AS FLOAT
+                    )
+                )
+            FROM LatestAccounts
+            WHERE rn = 1
+        """
+
+        cursor.execute(deposit_sql, params_dep)
+        result = cursor.fetchone()
+
+        if result and result[0] is not None:
+            data["total_deposits"] = float(result[0])
+
+        # =========================================================
+        # LOANS
+        # =========================================================
+        where_loan, params_loan = get_date_filter_sql(
+            period,
+            "BAL_IN_LOAN_ACC_GLCC_WISE_DET"
+        )
+
         if branch_code != "ALL":
-            where_loan += " AND BRANCH_CODE = ?" if "WHERE" in where_loan else " WHERE BRANCH_CODE = ?"
+            where_loan += (
+                " AND BRANCH_CODE = ?"
+                if "WHERE" in where_loan
+                else " WHERE BRANCH_CODE = ?"
+            )
             params_loan.append(branch_code)
-        cursor.execute(f"SELECT SUM(TRY_CAST(DR_BALANCE AS FLOAT)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET {where_loan}", params_loan)
-        res = cursor.fetchone()
-        if res and res[0]: data["total_loans"] = abs(res[0])
-        
-        # Total NPA
-        where_npa, params_npa = get_date_filter_sql(period, "NPA_STMT", "WHERE")
+
+        cursor.execute(
+            f"""
+            SELECT
+                SUM(
+                    TRY_CAST(
+                        REPLACE(
+                            ISNULL(DR_BALANCE, '0'),
+                            ',',
+                            ''
+                        ) AS FLOAT
+                    )
+                )
+            FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
+            {where_loan}
+            """,
+            params_loan,
+        )
+
+        result = cursor.fetchone()
+
+        if result and result[0] is not None:
+            data["total_loans"] = float(result[0])
+
+        # =========================================================
+        # NPA
+        # =========================================================
+        where_npa, params_npa = get_date_filter_sql(
+            period,
+            "NPA_STMT",
+            "WHERE"
+        )
+
         if branch_code != "ALL":
-            where_npa += " AND BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE BRANCH_CODE = ?"
+            where_npa += (
+                " AND BRANCH_CODE = ?"
+                if "WHERE" in where_npa
+                else " WHERE BRANCH_CODE = ?"
+            )
             params_npa.append(branch_code)
-        cursor.execute(f"SELECT SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) FROM NPA_STMT {where_npa}", params_npa)
-        res = cursor.fetchone()
-        if res and res[0]: data["total_npa"] = abs(res[0])
-        
-        # Branches Reporting
+
+        cursor.execute(
+            f"""
+            SELECT
+                SUM(
+                    TRY_CAST(
+                        REPLACE(
+                            ISNULL(BAL_OUTSTAND, '0'),
+                            ',',
+                            ''
+                        ) AS FLOAT
+                    )
+                )
+            FROM NPA_STMT
+            {where_npa}
+            """,
+            params_npa,
+        )
+
+        result = cursor.fetchone()
+
+        if result and result[0] is not None:
+            data["total_npa"] = float(result[0])
+
+        # =========================================================
+        # BRANCHES REPORTING
+        # =========================================================
         if branch_code == "ALL":
-            where_br, params_br = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
-            cursor.execute(f"SELECT COUNT(DISTINCT BRANCH_CODE) FROM DEPOSITS_BALANCE_FILE_DEPD0586 {where_br}", params_br)
-            res = cursor.fetchone()
-            if res and res[0]: data["branches_reporting"] = res[0]
+
+            where_br, params_br = get_date_filter_sql(
+                period,
+                "DEPOSITS_BALANCE_FILE_DEPD0586"
+            )
+
+            cursor.execute(
+                f"""
+                SELECT COUNT(DISTINCT BRANCH_CODE)
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_br}
+                """,
+                params_br,
+            )
+
+            result = cursor.fetchone()
+
+            if result and result[0] is not None:
+                data["branches_reporting"] = int(result[0])
+
         else:
             data["branches_reporting"] = 1
-            
+
     except Exception as e:
         print(f"Error calculating KPIs: {e}")
-        
-    conn.close()
+
+    finally:
+        conn.close()
+
     return data
+
 
 # ==========================================
 # 1. KPI Cards
@@ -1247,68 +1486,341 @@ if __name__ == "__main__":
 
 
 @app.get('/api/data/{table_name}')
-def get_dynamic_data(table_name: str, branch_code: str = 'ALL', page: int = 1, limit: int = 50, search: str = ''):
+def get_dynamic_data(
+    table_name: str,
+    branch_code: str = 'ALL',
+    page: int = 1,
+    limit: int = 50,
+    search: str = '',
+    sort_by: str = '',
+    sort_order: str = 'ASC'
+):
+    """
+    Generic dynamic data endpoint.
+
+    Supports:
+    - normal pagination
+    - search
+    - branch filtering
+    - Top 5
+    - Least 5
+    - safe dynamic sorting
+    """
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # 1. Validate table exists
-    cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?", (table_name.upper(),))
-    if not cursor.fetchone():
-        return {'columns': [], 'data': [], 'total_records': 0}
-        
-    # 2. Get valid columns and types
-    cursor.execute("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?", (table_name.upper(),))
-    col_info = cursor.fetchall()
-    
-    # Exclude internal IDs
-    exclude_cols = {'ID', 'SR_NO'}
-    columns = [row[0] for row in col_info if row[0].upper() not in exclude_cols]
-    
-    # Identify searchable string columns
-    searchable_cols = [row[0] for row in col_info if row[0].upper() not in exclude_cols and row[1].upper() in ('VARCHAR', 'NVARCHAR', 'CHAR', 'NCHAR', 'TEXT')]
-    
-    if not columns:
-        return {'columns': [], 'data': [], 'total_records': 0}
 
-    # 3. Build WHERE clause
-    where_clauses = ['1=1']
-    params = []
-    
-    if branch_code != 'ALL':
-        where_clauses.append('BRANCH_CODE = ?')
-        params.append(branch_code)
-        
-    if search and searchable_cols:
-        search_term = f"%{search}%"
-        search_clauses = [f"[{c}] LIKE ?" for c in searchable_cols]
-        where_clauses.append(f"({' OR '.join(search_clauses)})")
-        params.extend([search_term] * len(searchable_cols))
-        
-    where_sql = ' AND '.join(where_clauses)
-    
-    # 4. Get Total Records
-    count_query = f"SELECT COUNT(*) FROM [{table_name.upper()}] WHERE {where_sql}"
-    cursor.execute(count_query, tuple(params))
-    total_records = cursor.fetchone()[0]
-    
-    # 5. Get Paginated Data
-    offset = (page - 1) * limit
-    col_select = ', '.join([f"[{c}]" for c in columns])
-    # Order by first column as default to allow OFFSET
-    data_query = f"SELECT {col_select} FROM [{table_name.upper()}] WHERE {where_sql} ORDER BY [{columns[0]}] OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"
-    
-    cursor.execute(data_query, tuple(params + [offset, limit]))
-    
-    rows = []
-    for row in cursor.fetchall():
-        # Handle decimal serialization if necessary, usually PyODBC handles it or fastapi does
-        rows.append(dict(zip(columns, row)))
-        
-    return {
-        'columns': columns,
-        'data': rows,
-        'total_records': total_records
-    }
+    try:
+        # =====================================================
+        # 1. VALIDATE TABLE
+        # =====================================================
+        cursor.execute(
+            """
+            SELECT TABLE_NAME
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = ?
+            """,
+            (table_name.upper(),)
+        )
+
+        if not cursor.fetchone():
+            return {
+                'columns': [],
+                'data': [],
+                'total_records': 0
+            }
+
+        # =====================================================
+        # 2. GET TABLE COLUMNS
+        # =====================================================
+        cursor.execute(
+            """
+            SELECT
+                COLUMN_NAME,
+                DATA_TYPE
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = ?
+            ORDER BY ORDINAL_POSITION
+            """,
+            (table_name.upper(),)
+        )
+
+        col_info = cursor.fetchall()
+
+        # Internal columns should not be displayed
+        exclude_cols = {
+            'ID',
+            'SR_NO'
+        }
+
+        columns = [
+            row[0]
+            for row in col_info
+            if row[0].upper()
+            not in exclude_cols
+        ]
+
+        if not columns:
+            return {
+                'columns': [],
+                'data': [],
+                'total_records': 0
+            }
+
+        # =====================================================
+        # 3. SEARCHABLE COLUMNS
+        # =====================================================
+        searchable_cols = [
+            row[0]
+            for row in col_info
+            if (
+                row[0].upper()
+                not in exclude_cols
+                and row[1].upper()
+                in (
+                    'VARCHAR',
+                    'NVARCHAR',
+                    'CHAR',
+                    'NCHAR',
+                    'TEXT'
+                )
+            )
+        ]
+
+        # =====================================================
+        # 4. SAFE COLUMN MAP
+        # =====================================================
+        #
+        # Never trust sort_by directly in SQL.
+        # Only allow columns that actually exist.
+        #
+        column_map = {
+            column.upper(): column
+            for column in columns
+        }
+
+        # =====================================================
+        # 5. WHERE CLAUSE
+        # =====================================================
+        where_clauses = ['1=1']
+        params = []
+
+        if branch_code != 'ALL':
+            if 'BRANCH_CODE' in column_map:
+                where_clauses.append(
+                    '[BRANCH_CODE] = ?'
+                )
+                params.append(branch_code)
+
+        # Search
+        if search and searchable_cols:
+            search_term = f'%{search}%'
+
+            search_clauses = [
+                f'[{column}] LIKE ?'
+                for column in searchable_cols
+            ]
+
+            where_clauses.append(
+                f"({' OR '.join(search_clauses)})"
+            )
+
+            params.extend(
+                [search_term] *
+                len(searchable_cols)
+            )
+
+        where_sql = ' AND '.join(
+            where_clauses
+        )
+
+        # =====================================================
+        # 6. TOTAL RECORDS
+        # =====================================================
+        count_query = f"""
+            SELECT COUNT(*)
+            FROM [{table_name.upper()}]
+            WHERE {where_sql}
+        """
+
+        cursor.execute(
+            count_query,
+            tuple(params)
+        )
+
+        total_records = cursor.fetchone()[0]
+
+        # =====================================================
+        # 7. DETERMINE ORDER COLUMN
+        # =====================================================
+
+        if sort_by:
+            safe_sort_column = column_map.get(
+                sort_by.upper()
+            )
+        else:
+            safe_sort_column = None
+
+        # =====================================================
+        # 8. AUTO-DETECT RANK COLUMN
+        # =====================================================
+        #
+        # If frontend didn't provide sort_by,
+        # use a sensible numeric field.
+        #
+        if not safe_sort_column:
+
+            priority_columns = [
+                'CURRENT_BALANCE',
+                'BAL_OUTSTAND',
+                'TOTAL_OUTSTANDING',
+                'OUTSTANDING',
+                'TOTAL_AMOUNT',
+                'AMOUNT',
+                'BALANCE',
+                'DR_BALANCE',
+                'CR_BALANCE',
+                'NPA',
+                'VALUE'
+            ]
+
+            for preferred in priority_columns:
+                if preferred in column_map:
+                    safe_sort_column = (
+                        column_map[preferred]
+                    )
+                    break
+
+        # Final fallback
+        if not safe_sort_column:
+            safe_sort_column = columns[0]
+
+        # =====================================================
+        # 9. SAFE SORT ORDER
+        # =====================================================
+        safe_sort_order = (
+            'DESC'
+            if str(sort_order).upper()
+            == 'DESC'
+            else 'ASC'
+        )
+
+        # =====================================================
+        # 10. SELECT COLUMNS
+        # =====================================================
+        col_select = ', '.join(
+            f'[{column}]'
+            for column in columns
+        )
+
+        # =====================================================
+        # 11. ORDER BY
+        # =====================================================
+        #
+        # TRY_CAST allows numeric ranking even when
+        # database values are VARCHAR and contain commas.
+        #
+        # Example:
+        # "8,500.00"
+        # becomes 8500.00
+        #
+        order_expression = f"""
+            TRY_CAST(
+                REPLACE(
+                    REPLACE(
+                        ISNULL(
+                            [{safe_sort_column}],
+                            '0'
+                        ),
+                        ',',
+                        ''
+                    ),
+                    '₹',
+                    ''
+                )
+                AS FLOAT
+            )
+        """
+
+        # For normal tables, still use the selected
+        # column ordering.
+        #
+        # For ranking, numeric sorting is preferred.
+        data_query = f"""
+            SELECT {col_select}
+            FROM [{table_name.upper()}]
+            WHERE {where_sql}
+            ORDER BY
+                {order_expression}
+                {safe_sort_order},
+                [{columns[0]}] ASC
+            OFFSET ? ROWS
+            FETCH NEXT ? ROWS ONLY
+        """
+
+        # =====================================================
+        # 12. PAGINATION
+        # =====================================================
+        offset = max(
+            0,
+            (page - 1) * limit
+        )
+
+        effective_limit = max(
+            1,
+            min(limit, 1000)
+        )
+
+        query_params = (
+            params +
+            [
+                offset,
+                effective_limit
+            ]
+        )
+
+        cursor.execute(
+            data_query,
+            tuple(query_params)
+        )
+
+        # =====================================================
+        # 13. BUILD RESPONSE
+        # =====================================================
+        rows = []
+
+        for row in cursor.fetchall():
+
+            row_dict = {}
+
+            for column, value in zip(
+                columns,
+                row
+            ):
+                row_dict[column] = value
+
+            rows.append(row_dict)
+
+        return {
+            'columns': columns,
+            'data': rows,
+            'total_records': total_records
+        }
+
+    except Exception as e:
+
+        import traceback
+        traceback.print_exc()
+
+        return {
+            'columns': [],
+            'data': [],
+            'total_records': 0,
+            'error': str(e)
+        }
+
+    finally:
+        conn.close()
 
 
 @app.get('/api/visualize/{table_name}')
