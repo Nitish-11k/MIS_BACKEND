@@ -41,9 +41,12 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
       <div style={{ flex: 1, minHeight: 0 }}>
         {activeTabConfig && (
           <DynamicVisualizer 
-            key={activeTabConfig.id} // force remount on tab switch
+            key={activeTabConfig.id + selectedBranch + selectedPeriod + exactDate} 
             tableName={activeTabConfig.table} 
             title={activeTabConfig.label} 
+            branchCode={selectedBranch}
+            period={selectedPeriod}
+            exactDate={exactDate}
           />
         )}
       </div>

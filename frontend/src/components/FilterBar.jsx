@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Calendar, MapPin, Upload, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, Bell, X, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const FilterBar = ({
   branches,
@@ -10,43 +10,13 @@ const FilterBar = ({
   exactDate,
   setExactDate
 }) => {
-  const fileInputRef = useRef(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsUploading(true);
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append('files', files[i]);
-    }
-
-    try {
-      const response = await fetch('http://localhost:8000/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (response.ok) {
-        alert('Folder uploaded and parsed successfully!');
-        window.location.reload();
-      } else {
-        alert('Error uploading folder.');
-      }
-    } catch (error) {
-      console.error('Upload failed:', error);
-      alert('Upload failed: ' + error.message);
-    } finally {
-      setIsUploading(false);
-      // Reset input
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  
+  const notifications = [
+    { id: 1, type: 'success', title: 'Data Sync Completed', time: '10 mins ago', message: 'The date-wise upload for 12 Aug 2026 was processed successfully.' },
+    { id: 2, type: 'warning', title: 'High NPA Alert', time: '2 hours ago', message: 'Branch 00002 has exceeded the NPA threshold by 15%.' },
+    { id: 3, type: 'info', title: 'System Maintenance', time: '5 hours ago', message: 'Scheduled MIS downtime at 2:00 AM IST on Sunday.' }
+  ];
   return (
     <div className="dashboard-header sticky-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingTop: '20px', paddingBottom: '16px', borderBottom: '1px solid #E5E7EB', background: '#FFFFFF', position: 'sticky', top: 0, zIndex: 100 }}>
       <div className="header-title-section">
@@ -103,37 +73,18 @@ const FilterBar = ({
           </select>
         </div>
         
-        {/* Upload Folder Button */}
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          webkitdirectory="true" 
-          directory="true" 
-          multiple 
-          onChange={handleFileChange} 
-        />
-        <button 
-          onClick={handleUploadClick}
-          disabled={isUploading}
-          style={{ 
-            background: isUploading ? '#9CA3AF' : '#10B981', 
-            color: '#fff', 
-            border: 'none', 
-            padding: '9px 20px', 
-            borderRadius: '8px', 
-            fontWeight: '500', 
-            fontSize: '14px', 
-            cursor: isUploading ? 'not-allowed' : 'pointer', 
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-          {isUploading ? 'Uploading...' : 'Upload Reports'}
-        </button>
+        {/* Notification Bell */}
+        <div style={{ position: 'relative' }}>
+          <button 
+            onClick={() => setIsNotificationOpen(true)}
+            style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', padding: '10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Bell size={18} color="#4B5563" />
+            <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              3
+            </span>
+          </button>
+        </div>
 
         {/* Apply Button */}
         <button 
@@ -142,6 +93,65 @@ const FilterBar = ({
           Apply
         </button>
       </div>
+
+      {/* Slide-in Notification Panel */}
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: '350px',
+          background: '#fff',
+          boxShadow: '-4px 0 15px rgba(0,0,0,0.1)',
+          transform: isNotificationOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        <div style={{ padding: '20px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F9FAFB' }}>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bell size={18} color="#F97316" /> Notifications
+          </h2>
+          <button 
+            onClick={() => setIsNotificationOpen(false)}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {notifications.map(notif => (
+            <div key={notif.id} style={{ padding: '16px', borderRadius: '8px', border: '1px solid #E5E7EB', background: notif.type === 'warning' ? '#FEF2F2' : (notif.type === 'success' ? '#F0FDF4' : '#F8FAFC') }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div style={{ marginTop: '2px' }}>
+                  {notif.type === 'success' && <CheckCircle size={16} color="#16A34A" />}
+                  {notif.type === 'warning' && <AlertTriangle size={16} color="#DC2626" />}
+                  {notif.type === 'info' && <Info size={16} color="#0284C7" />}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{notif.title}</span>
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#4B5563', lineHeight: '1.4' }}>{notif.message}</div>
+                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '8px', fontWeight: '500' }}>{notif.time}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Background Overlay for Notification Panel */}
+      {isNotificationOpen && (
+        <div 
+          onClick={() => setIsNotificationOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 9998, backdropFilter: 'blur(2px)' }}
+        />
+      )}
     </div>
   );
 };

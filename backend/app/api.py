@@ -1,7 +1,13 @@
 import os
 import pyodbc
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+import json
+import threading
+import traceback
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from functools import lru_cache
 import shutil
@@ -26,13 +32,206 @@ async def pyodbc_exception_handler(request, exc):
     return JSONResponse(status_code=200, content=[])
 
 def get_db_connection():
+    # Try to get connection string from .env, fallback to hardcoded default
     conn_str = os.getenv("ODBC_CONNECTION_STRING")
     if not conn_str:
-        # Fallback to local default if env variable is missing
-        server = r"DESKTOP-CNDH3DO\MSSQLSERVER01"
-        database = "ManualMis"
-        conn_str = f'DRIVER={{SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;'
+        server = r"DESKTOP-CNDH3DO"
+        database = "MIS_DATABASE"
+        conn_str = f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
     return pyodbc.connect(conn_str)
+
+# --- UPLOAD ENGINE STATE ---
+upload_state = {
+    "is_running": False,
+    "total_files": 0,
+    "processed_files": 0,
+    "failed_files": 0,
+    "errors": [],
+    "progress_logs": [],
+    "current_file": "",
+    "scan_results": {
+        "existing_tables": [],
+        "new_tables": [],
+        "unsupported_files": []
+    }
+}
+
+def log_upload(message: str, is_error: bool = False):
+    print(message)
+    upload_state["progress_logs"].append({"timestamp": datetime.now().isoformat(), "message": message, "is_error": is_error})
+    # Keep only last 100 logs in memory
+    if len(upload_state["progress_logs"]) > 100:
+        upload_state["progress_logs"].pop(0)
+
+def background_process_folder(base_dir: str):
+    from app.parser.dispatcher import process_file
+    try:
+        upload_state["is_running"] = True
+        upload_state["total_files"] = 0
+        upload_state["processed_files"] = 0
+        upload_state["failed_files"] = 0
+        upload_state["errors"] = []
+        upload_state["progress_logs"] = []
+        
+        log_upload(f"Scanning base directory: {base_dir}")
+        
+        files_to_process = []
+        # Find all files in branch folders
+        if os.path.exists(base_dir):
+            for branch_folder in os.listdir(base_dir):
+                branch_path = os.path.join(base_dir, branch_folder)
+                if os.path.isdir(branch_path) and branch_folder.isdigit():
+                    for f in os.listdir(branch_path):
+                        if f.endswith(".txt") or f.endswith(".txt.gz"):
+                            files_to_process.append(os.path.join(branch_path, f))
+        
+        upload_state["total_files"] = len(files_to_process)
+        log_upload(f"Found {len(files_to_process)} files to process.")
+        
+        for filepath in files_to_process:
+            if not upload_state["is_running"]:
+                log_upload("Upload aborted.")
+                break
+                
+            upload_state["current_file"] = os.path.basename(filepath)
+            
+            try:
+                # Process the file (this automatically creates missing tables as per process_file logic)
+                process_file(filepath)
+                upload_state["processed_files"] += 1
+            except Exception as e:
+                error_msg = f"ERROR parsing {os.path.basename(filepath)}: {str(e)}"
+                log_upload(error_msg, is_error=True)
+                upload_state["errors"].append({"file": os.path.basename(filepath), "error": str(e), "trace": traceback.format_exc()})
+                upload_state["failed_files"] += 1
+                
+        log_upload("Processing complete.")
+    except Exception as e:
+        log_upload(f"FATAL ERROR in upload engine: {str(e)}", is_error=True)
+    finally:
+        upload_state["is_running"] = False
+        upload_state["current_file"] = ""
+
+class UploadRequest(BaseModel):
+    folder_path: str
+
+@app.post("/api/scan-folder")
+def scan_folder(req: UploadRequest):
+    from app.parser.metadata import extract_metadata
+    from app.parser.reader import read_report_lines
+    from app.parser.registry import REGISTRY
+    from app.db.tables import check_if_tables_exist
+    
+    base_dir = req.folder_path
+    if not os.path.exists(base_dir):
+        raise HTTPException(status_code=400, detail="Folder path does not exist on the server.")
+        
+    files_to_process = []
+    if os.path.exists(base_dir):
+        for branch_folder in os.listdir(base_dir):
+            branch_path = os.path.join(base_dir, branch_folder)
+            if os.path.isdir(branch_path) and branch_folder.isdigit():
+                for f in os.listdir(branch_path):
+                    if f.endswith(".txt") or f.endswith(".txt.gz"):
+                        files_to_process.append(os.path.join(branch_path, f))
+    
+    table_names_to_build = set()
+    unsupported_files = set()
+    
+    for filepath in files_to_process:
+        # Read only first 50 lines to extract metadata quickly
+        import gzip
+        lines = []
+        try:
+            if filepath.endswith(".gz"):
+                with gzip.open(filepath, "rt", encoding="utf-8", errors="replace") as f:
+                    for _ in range(50):
+                        line = f.readline()
+                        if not line: break
+                        lines.append(line)
+            else:
+                with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                    for _ in range(50):
+                        line = f.readline()
+                        if not line: break
+                        lines.append(line)
+        except Exception:
+            pass
+            
+        metadata = extract_metadata(lines)
+        report_id = metadata.get("REPORT_ID", "UNKNOWN")
+        
+        if report_id == "UNKNOWN" or report_id not in REGISTRY:
+            base_name = os.path.basename(filepath).lower()
+            for k in REGISTRY.keys():
+                if k.lower() in base_name:
+                    report_id = k
+                    break
+                    
+        if report_id not in REGISTRY:
+            unsupported_files.add(os.path.basename(filepath))
+        else:
+            parser_func = REGISTRY[report_id]
+            table_name = parser_func.__module__.split('.')[-1].upper()
+            table_names_to_build.add(table_name)
+            
+    # Check against database
+    table_status = check_if_tables_exist(list(table_names_to_build))
+    existing = [t for t, exists in table_status.items() if exists]
+    new = [t for t, exists in table_status.items() if not exists]
+    
+    upload_state["scan_results"] = {
+        "existing_tables": existing,
+        "new_tables": new,
+        "unsupported_files": list(unsupported_files)[:100] # Limit to avoid massive payload
+    }
+    
+    return upload_state["scan_results"]
+
+@app.get("/api/browse-folder")
+def browse_server_folder():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        # Create a dummy tk window and hide it
+        root = tk.Tk()
+        root.withdraw()
+        # Bring it to front
+        root.attributes('-topmost', True)
+        
+        folder_path = filedialog.askdirectory(title="Select Date-Wise MIS Folder")
+        root.destroy()
+        
+        return {"folder_path": folder_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/upload-folder")
+def start_upload_folder(req: UploadRequest):
+    if upload_state["is_running"]:
+        raise HTTPException(status_code=400, detail="An upload is already running.")
+    
+    if not os.path.exists(req.folder_path):
+        raise HTTPException(status_code=400, detail="Folder path does not exist on the server.")
+        
+    thread = threading.Thread(target=background_process_folder, args=(req.folder_path,))
+    thread.daemon = True
+    thread.start()
+    return {"message": "Upload processing started in background."}
+
+@app.get("/api/upload-status")
+def get_upload_status():
+    return upload_state
+
+@app.post("/api/upload-stop")
+def stop_upload():
+    if upload_state["is_running"]:
+        upload_state["is_running"] = False
+        return {"message": "Upload stop requested."}
+    return {"message": "No upload is running."}
+
+# --- END UPLOAD ENGINE ---
 
 def get_date_filter_sql(period: str, table_name: str, prefix: str = "WHERE", date_col: str = "PROC_DATE"):
     """Generates SQL condition for filtering by period based on the max date in the table, or by exact date."""
@@ -180,89 +379,328 @@ def get_closed_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
 
 @app.get("/api/deposit-branch-wise")
 @lru_cache(maxsize=128)
-def get_deposit_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
+def get_deposit_branch_wise(
+    branch_code: str = "ALL",
+    period: str = "ALL"
+):
+    """
+    Branch-wise deposit balance.
+
+    Source:
+        DEPOSITS_BALANCE_FILE_DEPD0586
+
+    Amount:
+        CURRENT_BALANCE
+
+    Duplicate protection:
+        One latest row per BRANCH_CODE + ACCOUNT_NUMBER.
+    """
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    where_dep, params_dep = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
-    
-    if branch_code != "ALL":
-        where_dep += " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
-        params_dep.append(branch_code)
-        
+
     try:
-        cursor.execute(f"""
-            SELECT BRANCH_NAME, SUM(TRY_CAST(CURRENT_BALANCE AS FLOAT)) as deposits
-            FROM DEPOSITS_BALANCE_FILE_DEPD0586
-            {where_dep}
-            GROUP BY BRANCH_NAME
-            ORDER BY deposits DESC
-        """, params_dep)
-        
+        where_dep, params_dep = get_date_filter_sql(
+            period,
+            "DEPOSITS_BALANCE_FILE_DEPD0586"
+        )
+
+        branch_condition = ""
+
+        if branch_code != "ALL":
+            branch_condition = " AND BRANCH_CODE = ?"
+            params_dep.append(branch_code)
+
+        query = f"""
+            WITH LatestAccounts AS (
+                SELECT
+                    ID,
+                    ACCOUNT_NUMBER,
+                    BRANCH_CODE,
+                    BRANCH_NAME,
+                    CURRENT_BALANCE,
+
+                    ROW_NUMBER() OVER (
+                        PARTITION BY
+                            BRANCH_CODE,
+                            ACCOUNT_NUMBER
+                        ORDER BY ID DESC
+                    ) AS rn
+
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_dep}
+                {branch_condition}
+            )
+
+            SELECT
+                BRANCH_CODE,
+                BRANCH_NAME,
+
+                SUM(
+                    TRY_CAST(
+                        REPLACE(
+                            ISNULL(CURRENT_BALANCE, '0'),
+                            ',',
+                            ''
+                        ) AS FLOAT
+                    )
+                ) AS TOTAL_DEPOSITS,
+
+                COUNT(*) AS ACCOUNT_COUNT
+
+            FROM LatestAccounts
+
+            WHERE rn = 1
+
+            GROUP BY
+                BRANCH_CODE,
+                BRANCH_NAME
+
+            ORDER BY TOTAL_DEPOSITS DESC
+        """
+
+        cursor.execute(query, params_dep)
+
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": abs(r[1] or 0)} for r in rows]
+
+        data = []
+
+        for row in rows:
+            data.append(
+                {
+                    "branch_code": str(row[0]).strip()
+                    if row[0] is not None
+                    else "",
+
+                    "name": (
+                        str(row[1]).strip()
+                        if row[1]
+                        else "Unknown"
+                    ),
+
+                    # IMPORTANT:
+                    # SmartModal expects `value`.
+                    "value": float(row[2])
+                    if row[2] is not None
+                    else 0.0,
+
+                    "account_count": int(row[3])
+                    if row[3] is not None
+                    else 0,
+                }
+            )
+
+        return data
+
     except Exception as e:
         print(f"Error calculating branch-wise deposits: {e}")
-        data = []
-        
-    conn.close()
-    return data
+        return []
+
+    finally:
+        conn.close()
+
+
 
 @app.get("/api/kpi-summary")
 @lru_cache(maxsize=128)
 def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL"):
+    """
+    KPI summary.
+
+    Deposit calculation:
+    - Uses DEPOSITS_BALANCE_FILE_DEPD0586
+    - Uses CURRENT_BALANCE
+    - Applies selected branch
+    - Applies selected exact date / period
+    - Prevents duplicate account rows from inflating the total
+    - Does NOT use ABS(SUM(...))
+    """
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     data = {
         "total_deposits": 0,
         "total_loans": 0,
         "total_npa": 0,
-        "branches_reporting": 0
+        "branches_reporting": 0,
     }
-    
+
     try:
-        # Total Deposits
-        where_dep, params_dep = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
+        # =========================================================
+        # DEPOSITS
+        # =========================================================
+        where_dep, params_dep = get_date_filter_sql(
+            period,
+            "DEPOSITS_BALANCE_FILE_DEPD0586"
+        )
+
+        branch_condition = ""
         if branch_code != "ALL":
-            where_dep += " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
+            branch_condition = " AND BRANCH_CODE = ?"
             params_dep.append(branch_code)
-        cursor.execute(f"SELECT SUM(TRY_CAST(CURRENT_BALANCE AS FLOAT)) FROM DEPOSITS_BALANCE_FILE_DEPD0586 {where_dep}", params_dep)
-        res = cursor.fetchone()
-        if res and res[0]: data["total_deposits"] = abs(res[0])
-        
-        # Total Loans
-        where_loan, params_loan = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET")
+
+        # We first select one record per ACCOUNT_NUMBER.
+        #
+        # This protects the KPI from duplicate account rows in the
+        # imported report.
+        #
+        # ID is the internal auto-increment ID generated by the
+        # ingestion layer and gives us deterministic latest-row
+        # selection when duplicates exist.
+        deposit_sql = f"""
+            WITH LatestAccounts AS (
+                SELECT
+                    ID,
+                    ACCOUNT_NUMBER,
+                    BRANCH_CODE,
+                    BRANCH_NAME,
+                    PROC_DATE,
+                    CURRENT_BALANCE,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY
+                            BRANCH_CODE,
+                            ACCOUNT_NUMBER
+                        ORDER BY ID DESC
+                    ) AS rn
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_dep}
+                {branch_condition}
+            )
+            SELECT
+                SUM(
+                    TRY_CAST(
+                        REPLACE(
+                            ISNULL(CURRENT_BALANCE, '0'),
+                            ',',
+                            ''
+                        ) AS FLOAT
+                    )
+                )
+            FROM LatestAccounts
+            WHERE rn = 1
+        """
+
+        cursor.execute(deposit_sql, params_dep)
+        result = cursor.fetchone()
+
+        if result and result[0] is not None:
+            data["total_deposits"] = float(result[0])
+
+        # =========================================================
+        # LOANS
+        # =========================================================
+        where_loan, params_loan = get_date_filter_sql(
+            period,
+            "BAL_IN_LOAN_ACC_GLCC_WISE_DET"
+        )
+
         if branch_code != "ALL":
-            where_loan += " AND BRANCH_CODE = ?" if "WHERE" in where_loan else " WHERE BRANCH_CODE = ?"
+            where_loan += (
+                " AND BRANCH_CODE = ?"
+                if "WHERE" in where_loan
+                else " WHERE BRANCH_CODE = ?"
+            )
             params_loan.append(branch_code)
-        cursor.execute(f"SELECT SUM(TRY_CAST(DR_BALANCE AS FLOAT)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET {where_loan}", params_loan)
-        res = cursor.fetchone()
-        if res and res[0]: data["total_loans"] = abs(res[0])
-        
-        # Total NPA
-        where_npa, params_npa = get_date_filter_sql(period, "NPA_STMT", "WHERE")
+
+        cursor.execute(
+            f"""
+            SELECT
+                SUM(
+                    TRY_CAST(
+                        REPLACE(
+                            ISNULL(DR_BALANCE, '0'),
+                            ',',
+                            ''
+                        ) AS FLOAT
+                    )
+                )
+            FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
+            {where_loan}
+            """,
+            params_loan,
+        )
+
+        result = cursor.fetchone()
+
+        if result and result[0] is not None:
+            data["total_loans"] = float(result[0])
+
+        # =========================================================
+        # NPA
+        # =========================================================
+        where_npa, params_npa = get_date_filter_sql(
+            period,
+            "NPA_STMT",
+            "WHERE"
+        )
+
         if branch_code != "ALL":
-            where_npa += " AND BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE BRANCH_CODE = ?"
+            where_npa += (
+                " AND BRANCH_CODE = ?"
+                if "WHERE" in where_npa
+                else " WHERE BRANCH_CODE = ?"
+            )
             params_npa.append(branch_code)
-        cursor.execute(f"SELECT SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) FROM NPA_STMT {where_npa}", params_npa)
-        res = cursor.fetchone()
-        if res and res[0]: data["total_npa"] = abs(res[0])
-        
-        # Branches Reporting
+
+        cursor.execute(
+            f"""
+            SELECT
+                SUM(
+                    TRY_CAST(
+                        REPLACE(
+                            ISNULL(BAL_OUTSTAND, '0'),
+                            ',',
+                            ''
+                        ) AS FLOAT
+                    )
+                )
+            FROM NPA_STMT
+            {where_npa}
+            """,
+            params_npa,
+        )
+
+        result = cursor.fetchone()
+
+        if result and result[0] is not None:
+            data["total_npa"] = float(result[0])
+
+        # =========================================================
+        # BRANCHES REPORTING
+        # =========================================================
         if branch_code == "ALL":
-            where_br, params_br = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
-            cursor.execute(f"SELECT COUNT(DISTINCT BRANCH_CODE) FROM DEPOSITS_BALANCE_FILE_DEPD0586 {where_br}", params_br)
-            res = cursor.fetchone()
-            if res and res[0]: data["branches_reporting"] = res[0]
+
+            where_br, params_br = get_date_filter_sql(
+                period,
+                "DEPOSITS_BALANCE_FILE_DEPD0586"
+            )
+
+            cursor.execute(
+                f"""
+                SELECT COUNT(DISTINCT BRANCH_CODE)
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_br}
+                """,
+                params_br,
+            )
+
+            result = cursor.fetchone()
+
+            if result and result[0] is not None:
+                data["branches_reporting"] = int(result[0])
+
         else:
             data["branches_reporting"] = 1
-            
+
     except Exception as e:
         print(f"Error calculating KPIs: {e}")
-        
-    conn.close()
+
+    finally:
+        conn.close()
+
     return data
+
 
 # ==========================================
 # 1. KPI Cards
@@ -768,23 +1206,23 @@ def get_npa_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
     where_npa, params_npa = get_date_filter_sql(period, "NPA_STMT", "WHERE")
     
     if branch_code != "ALL":
-        where_npa += " AND n.BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE n.BRANCH_CODE = ?"
+        where_npa += " AND NPA_STMT.BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE NPA_STMT.BRANCH_CODE = ?"
         params_npa.append(branch_code)
         
     if "WHERE" in where_npa:
-        where_npa += " AND n.BRANCH_CODE IS NOT NULL AND n.BRANCH_CODE != ''"
+        where_npa += " AND NPA_STMT.BRANCH_CODE IS NOT NULL AND NPA_STMT.BRANCH_CODE != ''"
     else:
-        where_npa = "WHERE n.BRANCH_CODE IS NOT NULL AND n.BRANCH_CODE != ''"
+        where_npa = "WHERE NPA_STMT.BRANCH_CODE IS NOT NULL AND NPA_STMT.BRANCH_CODE != ''"
         
     try:
         cursor.execute(f"""
             SELECT 
-                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = n.BRANCH_CODE), n.BRANCH_CODE) as BRANCH_NAME,
+                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = NPA_STMT.BRANCH_CODE), NPA_STMT.BRANCH_CODE) as BRANCH_NAME,
                 SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa, 
                 SUM(TRY_CAST(INCA AS FLOAT)) as covered
-            FROM NPA_STMT n
+            FROM NPA_STMT
             {where_npa}
-            GROUP BY n.BRANCH_CODE
+            GROUP BY NPA_STMT.BRANCH_CODE
             ORDER BY npa DESC
         """, params_npa)
         rows = cursor.fetchall()
@@ -1072,72 +1510,345 @@ if __name__ == "__main__":
 
 
 @app.get('/api/data/{table_name}')
-def get_dynamic_data(table_name: str, branch_code: str = 'ALL', page: int = 1, limit: int = 50, search: str = ''):
+def get_dynamic_data(
+    table_name: str,
+    branch_code: str = 'ALL',
+    page: int = 1,
+    limit: int = 50,
+    search: str = '',
+    sort_by: str = '',
+    sort_order: str = 'ASC'
+):
+    """
+    Generic dynamic data endpoint.
+
+    Supports:
+    - normal pagination
+    - search
+    - branch filtering
+    - Top 5
+    - Least 5
+    - safe dynamic sorting
+    """
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # 1. Validate table exists
-    cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?", (table_name.upper(),))
-    if not cursor.fetchone():
-        return {'columns': [], 'data': [], 'total_records': 0}
-        
-    # 2. Get valid columns and types
-    cursor.execute("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?", (table_name.upper(),))
-    col_info = cursor.fetchall()
-    
-    # Exclude internal IDs
-    exclude_cols = {'ID', 'SR_NO'}
-    columns = [row[0] for row in col_info if row[0].upper() not in exclude_cols]
-    
-    # Identify searchable string columns
-    searchable_cols = [row[0] for row in col_info if row[0].upper() not in exclude_cols and row[1].upper() in ('VARCHAR', 'NVARCHAR', 'CHAR', 'NCHAR', 'TEXT')]
-    
-    if not columns:
-        return {'columns': [], 'data': [], 'total_records': 0}
 
-    # 3. Build WHERE clause
-    where_clauses = ['1=1']
-    params = []
-    
-    if branch_code != 'ALL':
-        where_clauses.append('BRANCH_CODE = ?')
-        params.append(branch_code)
-        
-    if search and searchable_cols:
-        search_term = f"%{search}%"
-        search_clauses = [f"[{c}] LIKE ?" for c in searchable_cols]
-        where_clauses.append(f"({' OR '.join(search_clauses)})")
-        params.extend([search_term] * len(searchable_cols))
-        
-    where_sql = ' AND '.join(where_clauses)
-    
-    # 4. Get Total Records
-    count_query = f"SELECT COUNT(*) FROM [{table_name.upper()}] WHERE {where_sql}"
-    cursor.execute(count_query, tuple(params))
-    total_records = cursor.fetchone()[0]
-    
-    # 5. Get Paginated Data
-    offset = (page - 1) * limit
-    col_select = ', '.join([f"[{c}]" for c in columns])
-    # Order by first column as default to allow OFFSET
-    data_query = f"SELECT {col_select} FROM [{table_name.upper()}] WHERE {where_sql} ORDER BY [{columns[0]}] OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"
-    
-    cursor.execute(data_query, tuple(params + [offset, limit]))
-    
-    rows = []
-    for row in cursor.fetchall():
-        # Handle decimal serialization if necessary, usually PyODBC handles it or fastapi does
-        rows.append(dict(zip(columns, row)))
-        
-    return {
-        'columns': columns,
-        'data': rows,
-        'total_records': total_records
-    }
+    try:
+        # =====================================================
+        # 1. VALIDATE TABLE
+        # =====================================================
+        cursor.execute(
+            """
+            SELECT TABLE_NAME
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = ?
+            """,
+            (table_name.upper(),)
+        )
+
+        if not cursor.fetchone():
+            return {
+                'columns': [],
+                'data': [],
+                'total_records': 0
+            }
+
+        # =====================================================
+        # 2. GET TABLE COLUMNS
+        # =====================================================
+        cursor.execute(
+            """
+            SELECT
+                COLUMN_NAME,
+                DATA_TYPE
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = ?
+            ORDER BY ORDINAL_POSITION
+            """,
+            (table_name.upper(),)
+        )
+
+        col_info = cursor.fetchall()
+
+        # Internal columns should not be displayed
+        exclude_cols = {
+            'ID',
+            'SR_NO'
+        }
+
+        columns = [
+            row[0]
+            for row in col_info
+            if row[0].upper()
+            not in exclude_cols
+        ]
+
+        if not columns:
+            return {
+                'columns': [],
+                'data': [],
+                'total_records': 0
+            }
+
+        # =====================================================
+        # 3. SEARCHABLE COLUMNS
+        # =====================================================
+        searchable_cols = [
+            row[0]
+            for row in col_info
+            if (
+                row[0].upper()
+                not in exclude_cols
+                and row[1].upper()
+                in (
+                    'VARCHAR',
+                    'NVARCHAR',
+                    'CHAR',
+                    'NCHAR',
+                    'TEXT'
+                )
+            )
+        ]
+
+        # =====================================================
+        # 4. SAFE COLUMN MAP
+        # =====================================================
+        #
+        # Never trust sort_by directly in SQL.
+        # Only allow columns that actually exist.
+        #
+        column_map = {
+            column.upper(): column
+            for column in columns
+        }
+
+        # =====================================================
+        # 5. WHERE CLAUSE
+        # =====================================================
+        where_clauses = ['1=1']
+        params = []
+
+        if branch_code != 'ALL':
+            if 'BRANCH_CODE' in column_map:
+                where_clauses.append(
+                    '[BRANCH_CODE] = ?'
+                )
+                params.append(branch_code)
+
+        # Search
+        if search and searchable_cols:
+            search_term = f'%{search}%'
+
+            search_clauses = [
+                f'[{column}] LIKE ?'
+                for column in searchable_cols
+            ]
+
+            where_clauses.append(
+                f"({' OR '.join(search_clauses)})"
+            )
+
+            params.extend(
+                [search_term] *
+                len(searchable_cols)
+            )
+
+        where_sql = ' AND '.join(
+            where_clauses
+        )
+
+        # =====================================================
+        # 6. TOTAL RECORDS
+        # =====================================================
+        count_query = f"""
+            SELECT COUNT(*)
+            FROM [{table_name.upper()}]
+            WHERE {where_sql}
+        """
+
+        cursor.execute(
+            count_query,
+            tuple(params)
+        )
+
+        total_records = cursor.fetchone()[0]
+
+        # =====================================================
+        # 7. DETERMINE ORDER COLUMN
+        # =====================================================
+
+        if sort_by:
+            safe_sort_column = column_map.get(
+                sort_by.upper()
+            )
+        else:
+            safe_sort_column = None
+
+        # =====================================================
+        # 8. AUTO-DETECT RANK COLUMN
+        # =====================================================
+        #
+        # If frontend didn't provide sort_by,
+        # use a sensible numeric field.
+        #
+        if not safe_sort_column:
+
+            priority_columns = [
+                'CURRENT_BALANCE',
+                'BAL_OUTSTAND',
+                'TOTAL_OUTSTANDING',
+                'OUTSTANDING',
+                'TOTAL_AMOUNT',
+                'AMOUNT',
+                'BALANCE',
+                'DR_BALANCE',
+                'CR_BALANCE',
+                'NPA',
+                'VALUE'
+            ]
+
+            for preferred in priority_columns:
+                if preferred in column_map:
+                    safe_sort_column = (
+                        column_map[preferred]
+                    )
+                    break
+
+        # Final fallback
+        if not safe_sort_column:
+            safe_sort_column = columns[0]
+
+        # =====================================================
+        # 9. SAFE SORT ORDER
+        # =====================================================
+        safe_sort_order = (
+            'DESC'
+            if str(sort_order).upper()
+            == 'DESC'
+            else 'ASC'
+        )
+
+        # =====================================================
+        # 10. SELECT COLUMNS
+        # =====================================================
+        col_select = ', '.join(
+            f'[{column}]'
+            for column in columns
+        )
+
+        # =====================================================
+        # 11. ORDER BY
+        # =====================================================
+        #
+        # TRY_CAST allows numeric ranking even when
+        # database values are VARCHAR and contain commas.
+        #
+        # Example:
+        # "8,500.00"
+        # becomes 8500.00
+        #
+        order_expression = f"""
+            TRY_CAST(
+                REPLACE(
+                    REPLACE(
+                        ISNULL(
+                            [{safe_sort_column}],
+                            '0'
+                        ),
+                        ',',
+                        ''
+                    ),
+                    '₹',
+                    ''
+                )
+                AS FLOAT
+            )
+        """
+
+        # For normal tables, still use the selected
+        # column ordering.
+        #
+        # For ranking, numeric sorting is preferred.
+        data_query = f"""
+            SELECT {col_select}
+            FROM [{table_name.upper()}]
+            WHERE {where_sql}
+            ORDER BY
+                {order_expression}
+                {safe_sort_order},
+                [{columns[0]}] ASC
+            OFFSET ? ROWS
+            FETCH NEXT ? ROWS ONLY
+        """
+
+        # =====================================================
+        # 12. PAGINATION
+        # =====================================================
+        offset = max(
+            0,
+            (page - 1) * limit
+        )
+
+        effective_limit = max(
+            1,
+            min(limit, 1000)
+        )
+
+        query_params = (
+            params +
+            [
+                offset,
+                effective_limit
+            ]
+        )
+
+        cursor.execute(
+            data_query,
+            tuple(query_params)
+        )
+
+        # =====================================================
+        # 13. BUILD RESPONSE
+        # =====================================================
+        rows = []
+
+        for row in cursor.fetchall():
+
+            row_dict = {}
+
+            for column, value in zip(
+                columns,
+                row
+            ):
+                row_dict[column] = value
+
+            rows.append(row_dict)
+
+        return {
+            'columns': columns,
+            'data': rows,
+            'total_records': total_records
+        }
+
+    except Exception as e:
+
+        import traceback
+        traceback.print_exc()
+
+        return {
+            'columns': [],
+            'data': [],
+            'total_records': 0,
+            'error': str(e)
+        }
+
+    finally:
+        conn.close()
 
 
 @app.get('/api/visualize/{table_name}')
-def get_visualize_data(table_name: str):
+def get_visualize_data(table_name: str, branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -1149,7 +1860,17 @@ def get_visualize_data(table_name: str):
         return []
         
     # 2. Sample 1 row to guess numeric columns
-    cursor.execute(f"SELECT TOP 1 * FROM [{table_name.upper()}] WHERE BRANCH_CODE IS NOT NULL")
+    where_clause, params = get_date_filter_sql(period, table_name, "WHERE")
+    if branch_code != "ALL":
+        where_clause += f" AND BRANCH_CODE = ?" if "WHERE" in where_clause else f" WHERE BRANCH_CODE = ?"
+        params.append(branch_code)
+        
+    if "WHERE" in where_clause:
+        where_clause += " AND BRANCH_CODE IS NOT NULL AND BRANCH_CODE != ''"
+    else:
+        where_clause = "WHERE BRANCH_CODE IS NOT NULL AND BRANCH_CODE != ''"
+
+    cursor.execute(f"SELECT TOP 1 * FROM [{table_name.upper()}] {where_clause}", params)
     sample_row = cursor.fetchone()
     
     if not sample_row:
@@ -1158,10 +1879,16 @@ def get_visualize_data(table_name: str):
     row_dict = dict(zip(columns, sample_row))
     numeric_cols = []
     
-    exclude_cols = {'ID', 'SR_NO', 'BR_NO', 'ACCT_NO', 'CUST_NO', 'BRANCH_CODE', 'BRANCH_NAME', 'REPORT_ID', 'PROC_DATE'}
+    exclude_exact = {'ID', 'SR_NO', 'BR_NO', 'ACCT_NO', 'CUST_NO', 'BRANCH_CODE', 'BRANCH_NAME', 'REPORT_ID', 'PROC_DATE'}
+    exclude_substrings = ['_ID', 'ID_', 'NO_', '_NO', 'NUMBER', 'CODE', 'ACCT', 'CUST', 'DATE', 'SYS', 'NAME', 'BR_']
     
     for col, val in row_dict.items():
-        if col.upper() in exclude_cols:
+        col_upper = col.upper()
+        if col_upper in exclude_exact:
+            continue
+        if any(sub in col_upper for sub in exclude_substrings):
+            continue
+        if col_upper == 'ID' or col_upper == 'NO':
             continue
         if val is None:
             continue
@@ -1170,9 +1897,6 @@ def get_visualize_data(table_name: str):
             # Handle possible comma formatting in strings
             clean_val = str(val).replace(',', '')
             float(clean_val)
-            # If it didn't throw, it's likely numeric
-            # We don't want to sum things like phone numbers, but exclude_cols catches IDs usually
-            # Also exclude date strings that might accidentally parse, though float() usually fails on '25-OCT'
             numeric_cols.append(col)
         except ValueError:
             pass
@@ -1183,9 +1907,12 @@ def get_visualize_data(table_name: str):
     # 3. Aggregation Query
     # Use TRY_CAST in SQL Server to avoid crashing on dirty data
     sum_selects = ', '.join([f"SUM(TRY_CAST(REPLACE([{c}], ',', '') AS FLOAT)) as [{c}]" for c in numeric_cols])
-    query = f"SELECT BRANCH_CODE, {sum_selects} FROM [{table_name.upper()}] WHERE BRANCH_CODE IS NOT NULL GROUP BY BRANCH_CODE"
     
-    cursor.execute(query)
+    # If a specific branch is selected, maybe group by PROC_DATE? No, stick to BRANCH_CODE for consistency, or group by both.
+    # The UI DynamicVisualizer maps branchCode to 'name'. We will group by BRANCH_CODE.
+    query = f"SELECT BRANCH_CODE, {sum_selects} FROM [{table_name.upper()}] {where_clause} GROUP BY BRANCH_CODE"
+    
+    cursor.execute(query, params)
     
     result_columns = [column[0] for column in cursor.description]
     rows = []
