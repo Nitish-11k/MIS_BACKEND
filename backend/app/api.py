@@ -24,12 +24,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(pyodbc.Error)
+async def pyodbc_exception_handler(request, exc):
+    print(f"Database table missing or unavailable for {request.url.path} - Waiting for data upload.")
+    return JSONResponse(status_code=200, content=[])
 
 def get_db_connection():
-    # We will use Windows Authentication as per the user's .env configuration
-    server = r"DESKTOP-4QG3M53\MSSQLSERVER01"
-    database = "ManualMis"
-    conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;'
+    # Try to get connection string from .env, fallback to hardcoded default
+    conn_str = os.getenv("ODBC_CONNECTION_STRING")
+    if not conn_str:
+        server = r"DESKTOP-CNDH3DO"
+        database = "MIS_DATABASE"
+        conn_str = f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
     return pyodbc.connect(conn_str)
 
 # --- UPLOAD ENGINE STATE ---
@@ -247,6 +255,18 @@ def get_date_filter_sql(period: str, table_name: str, prefix: str = "WHERE", dat
     sql = f" {prefix} CONVERT(date, {table_name}.{date_col}, 103) >= DATEADD(day, -?, (SELECT MAX(CONVERT(date, {date_col}, 103)) FROM {table_name})) "
     return sql, [days]
 
+@app.get("/api/health-db")
+def check_db_connection():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT @@VERSION")
+        version = cursor.fetchone()[0]
+        conn.close()
+        return {"status": "success", "message": "Database is connected successfully!", "sql_server_version": version}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 # ==========================================
 # 0. Branches List
 # ==========================================
@@ -254,19 +274,23 @@ def get_date_filter_sql(period: str, table_name: str, prefix: str = "WHERE", dat
 def get_branches():
     conn = get_db_connection()
     cursor = conn.cursor()
-    # Distinct branches from a heavily populated table (e.g. LOANSBALANCEFILE_LOND2390)
-    cursor.execute("""
-        SELECT DISTINCT BRANCH_CODE, BRANCH_NAME 
-        FROM LOANSBALANCEFILE_LOND2390
-        WHERE BRANCH_CODE IS NOT NULL AND BRANCH_CODE != ''
-        ORDER BY BRANCH_CODE
-    """)
-    rows = cursor.fetchall()
-    conn.close()
-    
     branches = []
-    for row in rows:
-        branches.append({"code": row[0].strip(), "name": row[1].strip() if row[1] else "Unknown"})
+    try:
+        # Distinct branches from a heavily populated table (e.g. LOANSBALANCEFILE_LOND2390)
+        cursor.execute("""
+            SELECT DISTINCT BRANCH_CODE, BRANCH_NAME 
+            FROM LOANSBALANCEFILE_LOND2390
+            WHERE BRANCH_CODE IS NOT NULL AND BRANCH_CODE != ''
+            ORDER BY BRANCH_CODE
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            branches.append({"code": row[0].strip(), "name": row[1].strip() if row[1] else "Unknown"})
+    except Exception as e:
+        print(f"Skipping branches fetch: {e}")
+    finally:
+        conn.close()
+    
     return branches
 
 # ==========================================
