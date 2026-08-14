@@ -53,7 +53,22 @@ def parse(raw_lines):
                     row['THEO_BAL'] = num_parts[1] if len(num_parts) > 1 else ''
                     row['IRREGULARITY'] = num_parts[2] if len(num_parts) > 2 else ''
                     row['INTEREST'] = num_parts[3] if len(num_parts) > 3 else ''
-                    row['REMAINING_DATA'] = " ".join(num_parts[4:]) if len(num_parts) > 4 else ''
+                    remaining_str = " ".join(num_parts[4:]) if len(num_parts) > 4 else ''
+                    if remaining_str:
+                        rem_parts = re.split(r'\s+', remaining_str.strip())
+                        row['INSTALMENT'] = rem_parts[0] if len(rem_parts) > 0 else ''
+                        row['EMI_NONEMI'] = rem_parts[1] if len(rem_parts) > 1 else ''
+                        row['OLD_BAD_IND'] = rem_parts[2] if len(rem_parts) > 2 else ''
+                        row['NEW_BAD_IND'] = rem_parts[3] if len(rem_parts) > 3 else ''
+                        row['DATE'] = rem_parts[4] if len(rem_parts) > 4 else ''
+                        row['REMAINING_DATA'] = " ".join(rem_parts[5:]) if len(rem_parts) > 5 else ''
+                    else:
+                        row['INSTALMENT'] = ''
+                        row['EMI_NONEMI'] = ''
+                        row['OLD_BAD_IND'] = ''
+                        row['NEW_BAD_IND'] = ''
+                        row['DATE'] = ''
+                        row['REMAINING_DATA'] = ''
                 else:
                     row['DESCRIPT'] = rest
         
@@ -69,6 +84,7 @@ def parse(raw_lines):
             "SR_NO": "", "ACCOUNT_NO": "", "NAME_OF_BORROWER": "", 
             "TYPE": "", "CAT": "", "DESCRIPT": "", "APPROVAL_DATE": "",
             "OUTSTANDING": "", "THEO_BAL": "", "IRREGULARITY": "", "INTEREST": "",
+            "INSTALMENT": "", "EMI_NONEMI": "", "OLD_BAD_IND": "", "NEW_BAD_IND": "", "DATE": "",
             "REMAINING_DATA": "",
             "REPORT_ID": metadata.get("REPORT_ID", ""),
             "BRANCH_CODE": metadata.get("BRANCH_CODE", ""),

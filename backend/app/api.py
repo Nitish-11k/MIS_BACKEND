@@ -32,12 +32,13 @@ async def pyodbc_exception_handler(request, exc):
     return JSONResponse(status_code=200, content=[])
 
 def get_db_connection():
-    # Try to get connection string from .env, fallback to hardcoded default
     conn_str = os.getenv("ODBC_CONNECTION_STRING")
+
     if not conn_str:
-        server = r"DESKTOP-CNDH3DO"
-        database = "MIS_DATABASE"
-        conn_str = f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
+        raise RuntimeError(
+            "ODBC_CONNECTION_STRING is not set in the .env file"
+        )
+
     return pyodbc.connect(conn_str)
 
 # --- UPLOAD ENGINE STATE ---
