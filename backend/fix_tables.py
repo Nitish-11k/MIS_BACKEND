@@ -8,6 +8,8 @@ from app.api import get_db_connection
 conn = get_db_connection()
 conn.autocommit = True
 cursor = conn.cursor()
+conn.autocommit = True
+cursor = conn.cursor()
 
 cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'")
 tables_to_drop = [row[0] for row in cursor.fetchall()]

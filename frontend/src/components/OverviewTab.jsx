@@ -9,7 +9,11 @@ import {
   PieChart,
   Pie,
   Cell,
-  LabelList
+  LabelList,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  Legend
 } from 'recharts';
 import KPICard from './KPICard';
 
@@ -28,6 +32,7 @@ const OverviewTab = ({
   branchNpaData,
   barChartData,
   pieData,
+  trendData,
   setActiveModal,
 }) => {
   const [npaView, setNpaView] = useState('top');
@@ -668,6 +673,105 @@ const OverviewTab = ({
           </div>
         </div>
       </div>
+
+      {/* =======================================================
+          DATE-WISE TREND CHART (LOANS VS DEPOSITS)
+      ======================================================= */}
+      <div
+        className="card"
+        style={{
+          padding: '24px',
+          background: '#fff',
+          borderRadius: '12px',
+          border: '1px solid #E5E7EB',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          marginTop: '24px'
+        }}
+      >
+        <div style={{ marginBottom: '24px' }}>
+          <div
+            style={{
+              fontSize: '15px',
+              fontWeight: '700',
+              color: '#111827',
+            }}
+          >
+            Growth Trend (Loans vs Deposits)
+          </div>
+
+          <div
+            style={{
+              fontSize: '13px',
+              color: '#6B7280',
+            }}
+          >
+            ₹ in Lakhs • Time-series view
+          </div>
+        </div>
+
+        <div style={{ height: '320px' }}>
+          {!trendData || trendData.length === 0 ? (
+            <div
+              style={{
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6B7280',
+                fontSize: '14px',
+              }}
+            >
+              No trend data available for this period.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={trendData}
+                margin={{
+                  top: 10,
+                  right: 30,
+                  left: 0,
+                  bottom: 0,
+                }}
+              >
+                <defs>
+                  <linearGradient id="colorLoans" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorDeposits" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: '#6B7280' }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: '#6B7280' }}
+                  tickFormatter={(val) => `₹${(val).toLocaleString('en-IN')}`}
+                  width={80}
+                />
+                <Tooltip 
+                  formatter={(value, name) => [`₹ ${Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 })} L`, name]}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                />
+                <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }}/>
+                <Area type="monotone" dataKey="Loans" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorLoans)" />
+                <Area type="monotone" dataKey="Deposits" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorDeposits)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
     </div>
   );
 };

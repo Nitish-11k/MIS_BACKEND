@@ -26,16 +26,14 @@ def parse(raw_lines):
             continue
             
         row = {}
-        # 1: Account number (10-15 digits)
-        m1 = re.match(r'^(\d{10,16})\s+', stripped)
+        # 1: Account number (10-16 digits)
+        m1 = re.match(r'^\s*(\d{10,16})\s+', stripped)
         if m1:
             row['ACCOUNT_NO'] = m1.group(1)
             rest = stripped[m1.end():].strip()
             
-            # The remaining is: TYPE (string), NAME (string), and then 5 numeric fields, a date, and a number.
-            # Look for the sequence of numbers at the end.
-            # Typically it is: LIMIT INT_RATE THEO_BAL OUTSTANDING IRREGULARITY DATE STATUS
-            m2 = re.search(r'\s+([\d,]+\.\d{2})\s+(\d{2}\.\d{3})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+(\d{2}-\d{2}-\d{4})\s+(\d+)', rest)
+            # The remaining is: TYPE (string), NAME (string), and then numeric/date fields
+            m2 = re.search(r'\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{3}|[-0-9,]+\.\d+)\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{2})\s+(\d{2}-\d{2}-\d{4})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\w+)\s+(\w+)\s+([-0-9,]+\.\d{2})\s+(\w+)\s+(\w+)\s+(\w+)', rest)
             
             if m2:
                 row['LIMIT'] = m2.group(1)
@@ -44,7 +42,15 @@ def parse(raw_lines):
                 row['OUTSTANDING'] = m2.group(4)
                 row['IRREGULARITY'] = m2.group(5)
                 row['SANCTION_DATE'] = m2.group(6)
-                row['STATUS'] = m2.group(7)
+                row['EMIS_DUE'] = m2.group(7)
+                row['EMIS_PAID'] = m2.group(8)
+                row['EMIS_OVERDUE'] = m2.group(9)
+                row['NEW_IRAC'] = m2.group(10)
+                row['OLD_IRAC'] = m2.group(11)
+                row['ADV_PAID_AMT'] = m2.group(12)
+                row['ARREAR_COND'] = m2.group(13)
+                row['CURRENCY'] = m2.group(14)
+                row['ACCT_MTAIN_BRCH'] = m2.group(15)
                 
                 # Everything before LIMIT is TYPE and NAME
                 type_and_name = rest[:m2.start()].strip()
@@ -52,11 +58,11 @@ def parse(raw_lines):
                 # TYPE is usually up to 25 chars, or we can just split by 2+ spaces
                 tn_parts = re.split(r'\s{2,}', type_and_name)
                 if len(tn_parts) >= 2:
-                    row['TYPE'] = tn_parts[0]
-                    row['NAME'] = " ".join(tn_parts[1:])
+                    row['ACCOUNT_TYPE'] = tn_parts[0]
+                    row['CUSTOMER_NAME'] = " ".join(tn_parts[1:])
                 else:
-                    row['TYPE'] = type_and_name
-                    row['NAME'] = type_and_name
+                    row['ACCOUNT_TYPE'] = type_and_name
+                    row['CUSTOMER_NAME'] = type_and_name
         
         if 'ACCOUNT_NO' in row:
             row["REPORT_ID"] = metadata.get("REPORT_ID", "")
@@ -67,7 +73,7 @@ def parse(raw_lines):
             
     if not rows:
         rows.append({
-            "ACCOUNT_NO": "", "TYPE": "", "NAME": "", "LIMIT": "",
+            "ACCOUNT_NO": "", "ACCOUNT_TYPE": "", "CUSTOMER_NAME": "", "LIMIT": "",
             "INT_RATE": "", "THEO_BAL": "", "OUTSTANDING": "", 
             "IRREGULARITY": "", "SANCTION_DATE": "", "STATUS": "",
             "REPORT_ID": metadata.get("REPORT_ID", ""),
