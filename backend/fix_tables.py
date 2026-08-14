@@ -1,8 +1,12 @@
 import pyodbc
+import sys
+import os
 
-server = r'DESKTOP-4QG3M53\MSSQLSERVER01'
-database = 'ManualMis'
-conn = pyodbc.connect(f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;')
+sys.path.append(os.path.dirname(__file__))
+from app.api import get_db_connection
+
+conn = get_db_connection()
+conn.autocommit = True
 cursor = conn.cursor()
 conn.autocommit = True
 cursor = conn.cursor()

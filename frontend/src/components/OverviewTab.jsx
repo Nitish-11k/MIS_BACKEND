@@ -85,11 +85,20 @@ const OverviewTab = ({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+          gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
           gap: '20px',
           marginBottom: '24px',
         }}
       >
+        <KPICard
+          title="Total Accounts"
+          value={accountMetrics.total}
+          isCurrency={false}
+          changePercent="1.2"
+          changeType="positive"
+          onClick={() => setActiveModal('total')}
+        />
+
         <KPICard
           title="Total Deposits"
           value={kpiData.total_deposits}

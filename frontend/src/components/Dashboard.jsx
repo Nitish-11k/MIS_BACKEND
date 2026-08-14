@@ -60,7 +60,8 @@ const Dashboard = () => {
       });
       setAccountMetrics({
         opened: accMetrics.opened || 0,
-        closed: accMetrics.closed || 0
+        closed: accMetrics.closed || 0,
+        total: accMetrics.total || 0
       });
       
       setBranchNpaData(npaData && npaData.length > 0 ? npaData.map(d => ({ ...d, NPA: (d.NPA||0)/100000, Covered: (d.Covered||0)/100000 })) : []);
