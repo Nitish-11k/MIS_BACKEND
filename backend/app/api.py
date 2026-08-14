@@ -248,8 +248,10 @@ def get_date_filter_sql(period: str, table_name: str, prefix: str = "WHERE", dat
         
     days = 0
     if period == "7D": days = 7
+    elif period == "15D": days = 15
     elif period == "30D": days = 30
     elif period == "6M": days = 180
+    elif period == "1Y": days = 365
     else: return "", []
     
     # Converts DD/MM/YYYY (103) to Date for comparison against the max date available in the mock DB
@@ -330,21 +332,23 @@ def get_opened_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    where_sql, params = get_date_filter_sql(period, "ACCOUNT_OPENED_REPORT")
+    where_sql, params = get_date_filter_sql(period, "ACCOUNT_OPENED_REPORT", date_col="OPENED_DATE")
     if branch_code != "ALL":
         where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
         params.append(branch_code)
         
     try:
         cursor.execute(f"""
-            SELECT BRANCH_NAME, COUNT(*) as cnt
+            SELECT BRANCH_NAME, COUNT(*) as cnt,
+                   SUM(CASE WHEN PRODUCT LIKE '6%' THEN 1 ELSE 0 END) as loan_accounts,
+                   SUM(CASE WHEN PRODUCT NOT LIKE '6%' THEN 1 ELSE 0 END) as deposit_accounts
             FROM ACCOUNT_OPENED_REPORT
             {where_sql}
             GROUP BY BRANCH_NAME
             ORDER BY cnt DESC
         """, params)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1]} for r in rows]
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
     except Exception as e:
         print(f"Error calculating branch-wise opened: {e}")
         data = []
@@ -357,23 +361,70 @@ def get_closed_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    where_sql, params = get_date_filter_sql(period, "ACCOUNT_CLOSED_REPORT")
+    where_sql, params = get_date_filter_sql(period, "ACCOUNT_CLOSED_REPORT", date_col="CLOSED_DATE")
     if branch_code != "ALL":
         where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
         params.append(branch_code)
         
     try:
         cursor.execute(f"""
-            SELECT BRANCH_NAME, COUNT(*) as cnt
+            SELECT BRANCH_NAME, COUNT(*) as cnt,
+                   SUM(CASE WHEN PRODUCT LIKE '6%' THEN 1 ELSE 0 END) as loan_accounts,
+                   SUM(CASE WHEN PRODUCT NOT LIKE '6%' THEN 1 ELSE 0 END) as deposit_accounts
             FROM ACCOUNT_CLOSED_REPORT
             {where_sql}
             GROUP BY BRANCH_NAME
             ORDER BY cnt DESC
         """, params)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1]} for r in rows]
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
     except Exception as e:
         print(f"Error calculating branch-wise closed: {e}")
+        data = []
+    conn.close()
+    return data
+
+@app.get("/api/total-branch-wise")
+@lru_cache(maxsize=128)
+def get_total_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    where_dep, params_dep = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
+    if branch_code != "ALL":
+        where_dep += " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
+        params_dep.append(branch_code)
+        
+    where_loan, params_loan = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET")
+    if branch_code != "ALL":
+        where_loan += " AND BRANCH_CODE = ?" if "WHERE" in where_loan else " WHERE BRANCH_CODE = ?"
+        params_loan.append(branch_code)
+        
+    try:
+        cursor.execute(f"""
+            SELECT 
+                COALESCE(D.BRANCH_NAME, L.BRANCH_NAME) AS BRANCH_NAME,
+                ISNULL(D.dep_cnt, 0) + ISNULL(L.loan_cnt, 0) AS cnt,
+                ISNULL(L.loan_cnt, 0) AS loan_accounts,
+                ISNULL(D.dep_cnt, 0) AS deposit_accounts
+            FROM (
+                SELECT BRANCH_NAME, COUNT(DISTINCT ACCOUNT_NUMBER) as dep_cnt
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_dep}
+                GROUP BY BRANCH_NAME
+            ) D
+            FULL OUTER JOIN (
+                SELECT BRANCH_NAME, COUNT(DISTINCT ACCOUNT) as loan_cnt
+                FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
+                {where_loan}
+                GROUP BY BRANCH_NAME
+            ) L ON D.BRANCH_NAME = L.BRANCH_NAME
+            ORDER BY cnt DESC
+        """, params_dep + params_loan)
+        rows = cursor.fetchall()
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
+    except Exception as e:
+        print(f"Error calculating total branch-wise: {e}")
         data = []
     conn.close()
     return data
@@ -1439,24 +1490,46 @@ def get_report_stats(table_name: str, branch_code: str = "ALL"):
 def get_account_metrics(branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
-    data = {"opened": 0, "closed": 0}
+    data = {"opened": 0, "closed": 0, "total": 0}
     
     try:
-        where_sql, params = get_date_filter_sql(period, "ACCOUNT_OPENED_REPORT")
+        # 1. Total Accounts: Get from latest available balance snapshot
+        dep_query = "SELECT COUNT(DISTINCT ACCOUNT_NUMBER) FROM DEPOSITS_BALANCE_FILE_DEPD0586 WHERE CONVERT(date, PROC_DATE, 103) = (SELECT MAX(CONVERT(date, PROC_DATE, 103)) FROM DEPOSITS_BALANCE_FILE_DEPD0586)"
+        params_dep = []
         if branch_code != "ALL":
-            where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
-            params.append(branch_code)
+            dep_query += " AND BRANCH_CODE = ?"
+            params_dep.append(branch_code)
+        cursor.execute(dep_query, params_dep)
+        res = cursor.fetchone()
+        dep_count = res[0] if res else 0
+
+        loan_query = "SELECT COUNT(DISTINCT ACCOUNT) FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET WHERE CONVERT(date, PROC_DATE, 103) = (SELECT MAX(CONVERT(date, PROC_DATE, 103)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET)"
+        params_loan = []
+        if branch_code != "ALL":
+            loan_query += " AND BRANCH_CODE = ?"
+            params_loan.append(branch_code)
+        cursor.execute(loan_query, params_loan)
+        res = cursor.fetchone()
+        loan_count = res[0] if res else 0
+
+        data["total"] = dep_count + loan_count
+
+        # 2. Opened and Closed Accounts: Count records using OPENED_DATE/CLOSED_DATE according to the selected filter
+        where_sql_opened, params_opened = get_date_filter_sql(period, "ACCOUNT_OPENED_REPORT", date_col="OPENED_DATE")
+        if branch_code != "ALL":
+            where_sql_opened += " AND BRANCH_CODE = ?" if "WHERE" in where_sql_opened else " WHERE BRANCH_CODE = ?"
+            params_opened.append(branch_code)
         
-        cursor.execute(f"SELECT COUNT(*) FROM ACCOUNT_OPENED_REPORT {where_sql}", params)
+        cursor.execute(f"SELECT COUNT(*) FROM ACCOUNT_OPENED_REPORT {where_sql_opened}", params_opened)
         res = cursor.fetchone()
         if res: data["opened"] = res[0]
         
-        where_sql, params = get_date_filter_sql(period, "ACCOUNT_CLOSED_REPORT")
+        where_sql_closed, params_closed = get_date_filter_sql(period, "ACCOUNT_CLOSED_REPORT", date_col="CLOSED_DATE")
         if branch_code != "ALL":
-            where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
-            params.append(branch_code)
+            where_sql_closed += " AND BRANCH_CODE = ?" if "WHERE" in where_sql_closed else " WHERE BRANCH_CODE = ?"
+            params_closed.append(branch_code)
             
-        cursor.execute(f"SELECT COUNT(*) FROM ACCOUNT_CLOSED_REPORT {where_sql}", params)
+        cursor.execute(f"SELECT COUNT(*) FROM ACCOUNT_CLOSED_REPORT {where_sql_closed}", params_closed)
         res = cursor.fetchone()
         if res: data["closed"] = res[0]
         

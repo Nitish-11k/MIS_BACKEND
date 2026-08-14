@@ -258,6 +258,15 @@ const SmartModal = ({ type, branchCode, period, onClose }) => {
           isCount: true,
         };
 
+      case 'total':
+        return {
+          endpoint: '/api/total-branch-wise',
+          title: 'Total Accounts Analysis',
+          amountKey: 'value',
+          amountLabel: 'Total Accounts',
+          isCount: true,
+        };
+
       default:
         return null;
     }
@@ -387,6 +396,24 @@ const SmartModal = ({ type, branchCode, period, onClose }) => {
           ? row.numericValue.toLocaleString('en-IN')
           : formatINR(row.numericValue),
     },
+    ...(type === 'opened' || type === 'closed' || type === 'total'
+      ? [
+          {
+            name: 'Deposit Accounts',
+            selector: (row) => row.deposit_accounts || 0,
+            sortable: true,
+            right: true,
+            cell: (row) => (row.deposit_accounts || 0).toLocaleString('en-IN'),
+          },
+          {
+            name: 'Loan Accounts',
+            selector: (row) => row.loan_accounts || 0,
+            sortable: true,
+            right: true,
+            cell: (row) => (row.loan_accounts || 0).toLocaleString('en-IN'),
+          },
+        ]
+      : []),
     {
       name: 'Share',
       selector: (row) => row.numericValue,

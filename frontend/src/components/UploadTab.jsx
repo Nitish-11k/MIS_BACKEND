@@ -44,6 +44,9 @@ const UploadTab = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  const [singleFile, setSingleFile] = useState(null);
+  const [isUploadingSingle, setIsUploadingSingle] = useState(false);
+
   const logsEndRef = useRef(null);
 
   // ============================================================
@@ -244,6 +247,43 @@ const UploadTab = () => {
         error.message ||
           'Network error while starting upload.'
       );
+    }
+  };
+
+  const handleSingleFileUpload = async () => {
+    if (!singleFile) {
+      setErrorMsg('Please select a file first.');
+      return;
+    }
+    
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsUploadingSingle(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('files', singleFile);
+      
+      const response = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to upload file.');
+      }
+      
+      setSuccessMsg(`File ${singleFile.name} processed successfully!`);
+      setSingleFile(null);
+      const fileInput = document.getElementById('single-file-input');
+      if (fileInput) fileInput.value = '';
+    } catch (error) {
+      console.error('Single upload error:', error);
+      setErrorMsg(error.message || 'Error uploading file.');
+    } finally {
+      setIsUploadingSingle(false);
     }
   };
 
@@ -884,17 +924,81 @@ const UploadTab = () => {
                   gap: '7px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: '#DC2626',
+                  background: '#EF4444',
                   color: '#FFFFFF',
                   fontSize: '13px',
                   fontWeight: '700',
                   cursor: 'pointer',
+                  boxShadow:
+                    '0 2px 5px rgba(239, 68, 68, 0.20)',
                 }}
               >
-                <Square size={15} />
+                <XCircle size={16} />
                 Stop
               </button>
             )}
+          </div>
+          
+          <hr style={{ border: 'none', borderTop: '1px solid #E2E8F0', margin: '20px 0' }} />
+          
+          {/* Single File Upload Temporary Option */}
+          <label
+            style={{
+              display: 'block',
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#334155',
+              marginBottom: '7px',
+            }}
+          >
+            Single File Upload (Temporary)
+          </label>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <input
+                id="single-file-input"
+                type="file"
+                accept=".txt,.gz"
+                disabled={isRunning || isUploadingSingle}
+                onChange={(e) => setSingleFile(e.target.files[0])}
+                style={{
+                  width: '100%',
+                  padding: '9px 14px',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  background: isRunning || isUploadingSingle ? '#F8FAFC' : '#FFFFFF',
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleSingleFileUpload}
+              disabled={isRunning || isUploadingSingle || !singleFile}
+              style={{
+                height: '42px',
+                padding: '0 19px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '7px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#10B981',
+                color: '#FFFFFF',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: (isRunning || isUploadingSingle || !singleFile) ? 'not-allowed' : 'pointer',
+                opacity: (isRunning || isUploadingSingle || !singleFile) ? 0.7 : 1,
+                boxShadow: '0 2px 5px rgba(16, 185, 129, 0.20)',
+              }}
+            >
+              {isUploadingSingle ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <UploadCloud size={16} />
+              )}
+              {isUploadingSingle ? 'Uploading...' : 'Upload File'}
+            </button>
           </div>
 
           {/* Helper text */}

@@ -61,14 +61,12 @@ def parse(raw_lines):
                         row['OLD_BAD_IND'] = rem_parts[2] if len(rem_parts) > 2 else ''
                         row['NEW_BAD_IND'] = rem_parts[3] if len(rem_parts) > 3 else ''
                         row['DATE'] = rem_parts[4] if len(rem_parts) > 4 else ''
-                        row['REMAINING_DATA'] = " ".join(rem_parts[5:]) if len(rem_parts) > 5 else ''
                     else:
                         row['INSTALMENT'] = ''
                         row['EMI_NONEMI'] = ''
                         row['OLD_BAD_IND'] = ''
                         row['NEW_BAD_IND'] = ''
                         row['DATE'] = ''
-                        row['REMAINING_DATA'] = ''
                 else:
                     row['DESCRIPT'] = rest
         
@@ -85,7 +83,6 @@ def parse(raw_lines):
             "TYPE": "", "CAT": "", "DESCRIPT": "", "APPROVAL_DATE": "",
             "OUTSTANDING": "", "THEO_BAL": "", "IRREGULARITY": "", "INTEREST": "",
             "INSTALMENT": "", "EMI_NONEMI": "", "OLD_BAD_IND": "", "NEW_BAD_IND": "", "DATE": "",
-            "REMAINING_DATA": "",
             "REPORT_ID": metadata.get("REPORT_ID", ""),
             "BRANCH_CODE": metadata.get("BRANCH_CODE", ""),
             "BRANCH_NAME": metadata.get("BRANCH_NAME", ""),
