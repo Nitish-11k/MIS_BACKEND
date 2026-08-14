@@ -12,7 +12,11 @@ def create_table_if_not_exists(table_name, column_names, primary_key_columns=Non
     inspector = inspect(engine)
 
     if inspector.has_table(table_name):
-        return Table(table_name, metadata, autoload_with=engine)
+        from sqlalchemy import Integer
+        columns = [Column("id", Integer, primary_key=True, autoincrement=True)]
+        for cname in column_names:
+            columns.append(Column(cname, String(500)))
+        return Table(table_name, metadata, *columns)
 
     if primary_key_columns is None:
         primary_key_columns = []
