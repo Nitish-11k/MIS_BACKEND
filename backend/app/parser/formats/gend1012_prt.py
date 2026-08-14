@@ -25,16 +25,25 @@ def parse(raw_lines):
         if not data_started:
             continue
             
+        # Skip empty lines or leftover headers
+        if not line.strip() or line.startswith('NIL REPORT') or "TOTAL" in line.upper() or "JRNL NO" in line.upper() or "SUM " in line.upper():
+            continue
+            
         row = {
-            "JOURNAL_NO": line[0:27].strip(),
-            "LCY_AMOUNT": line[28:].strip(),
+            "JRNL_NO": line[0:11].strip(),
+            "TXN_NO": line[11:17].strip(),
+            "DESCRIPTION": line[17:48].strip(),
+            "ACCOUNT_NO": line[48:62].strip(),
+            "GLCC_CODE": line[62:82].strip(),
+            "TXN_TIME": line[82:95].strip(),
+            "AMOUNT": line[95:110].strip(),
+            "AMOUNT_IN_TECH_CONT": line[110:].strip()
         }
         
         if "*Note:" in line or "For other enteries" in line or "Please confirm" in line:
             break
             
-        # skip lines that are obviously just leftover headers or empty
-        if not row['JOURNAL_NO'].strip() or row['JOURNAL_NO'].startswith('NIL REPORT') or "TOTAL" in row['JOURNAL_NO'].upper() or "JRNL NO" in row['JOURNAL_NO'].upper():
+        if not row['JRNL_NO'] and not row['AMOUNT']:
             continue
             
         row["REPORT_ID"] = metadata.get("REPORT_ID", "")
@@ -46,8 +55,14 @@ def parse(raw_lines):
 
     if not rows:
         rows.append({
-            "JOURNAL_NO": "",
-            "LCY_AMOUNT": "",
+            "JRNL_NO": "",
+            "TXN_NO": "",
+            "DESCRIPTION": "",
+            "ACCOUNT_NO": "",
+            "GLCC_CODE": "",
+            "TXN_TIME": "",
+            "AMOUNT": "",
+            "AMOUNT_IN_TECH_CONT": "",
             "REPORT_ID": metadata.get("REPORT_ID", ""),
             "BRANCH_CODE": metadata.get("BRANCH_CODE", ""),
             "BRANCH_NAME": metadata.get("BRANCH_NAME", ""),

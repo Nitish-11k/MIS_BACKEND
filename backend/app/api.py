@@ -35,9 +35,9 @@ def get_db_connection():
     # Try to get connection string from .env, fallback to hardcoded default
     conn_str = os.getenv("ODBC_CONNECTION_STRING")
     if not conn_str:
-        server = r"DESKTOP-CNDH3DO"
-        database = "MIS_DATABASE"
-        conn_str = f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
+        server = r"DESKTOP-4QG3M53"
+        database = "ManualMis"
+        conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
     return pyodbc.connect(conn_str)
 
 # --- UPLOAD ENGINE STATE ---
@@ -76,14 +76,17 @@ def background_process_folder(base_dir: str):
         log_upload(f"Scanning base directory: {base_dir}")
         
         files_to_process = []
-        # Find all files in branch folders
+        # Find all files in base directory and digit-named subdirectories
         if os.path.exists(base_dir):
-            for branch_folder in os.listdir(base_dir):
-                branch_path = os.path.join(base_dir, branch_folder)
-                if os.path.isdir(branch_path) and branch_folder.isdigit():
-                    for f in os.listdir(branch_path):
-                        if f.endswith(".txt") or f.endswith(".txt.gz"):
-                            files_to_process.append(os.path.join(branch_path, f))
+            for entry in os.listdir(base_dir):
+                entry_path = os.path.join(base_dir, entry)
+                if os.path.isdir(entry_path) and entry.isdigit():
+                    for f in os.listdir(entry_path):
+                        if (f.endswith(".txt") or f.endswith(".txt.gz")) and "gend1012.prt2" not in f.lower():
+                            files_to_process.append(os.path.join(entry_path, f))
+                elif os.path.isfile(entry_path):
+                    if (entry.endswith(".txt") or entry.endswith(".txt.gz")) and "gend1012.prt2" not in entry.lower():
+                        files_to_process.append(entry_path)
         
         upload_state["total_files"] = len(files_to_process)
         log_upload(f"Found {len(files_to_process)} files to process.")
@@ -128,12 +131,15 @@ def scan_folder(req: UploadRequest):
         
     files_to_process = []
     if os.path.exists(base_dir):
-        for branch_folder in os.listdir(base_dir):
-            branch_path = os.path.join(base_dir, branch_folder)
-            if os.path.isdir(branch_path) and branch_folder.isdigit():
-                for f in os.listdir(branch_path):
-                    if f.endswith(".txt") or f.endswith(".txt.gz"):
-                        files_to_process.append(os.path.join(branch_path, f))
+        for entry in os.listdir(base_dir):
+            entry_path = os.path.join(base_dir, entry)
+            if os.path.isdir(entry_path) and entry.isdigit():
+                for f in os.listdir(entry_path):
+                    if (f.endswith(".txt") or f.endswith(".txt.gz")) and "gend1012.prt2" not in f.lower():
+                        files_to_process.append(os.path.join(entry_path, f))
+            elif os.path.isfile(entry_path):
+                if (entry.endswith(".txt") or entry.endswith(".txt.gz")) and "gend1012.prt2" not in entry.lower():
+                    files_to_process.append(entry_path)
     
     table_names_to_build = set()
     unsupported_files = set()
@@ -215,6 +221,7 @@ def start_upload_folder(req: UploadRequest):
     if not os.path.exists(req.folder_path):
         raise HTTPException(status_code=400, detail="Folder path does not exist on the server.")
         
+    upload_state["is_running"] = True
     thread = threading.Thread(target=background_process_folder, args=(req.folder_path,))
     thread.daemon = True
     thread.start()
@@ -266,6 +273,79 @@ def check_db_connection():
         return {"status": "success", "message": "Database is connected successfully!", "sql_server_version": version}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+# ==========================================
+# Notifications
+# ==========================================
+@app.get("/api/notifications")
+def get_notifications(branch_code: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    notifications = []
+    
+    try:
+        # 1. High NPA Alert
+        where_branch = ""
+        params = []
+        if branch_code != "ALL":
+            where_branch = "WHERE BRANCH_CODE = ?"
+            params.append(branch_code)
+            
+        cursor.execute(f"""
+            SELECT TOP 1 
+                NPA_STMT.BRANCH_CODE,
+                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = NPA_STMT.BRANCH_CODE), NPA_STMT.BRANCH_CODE) as BRANCH_NAME,
+                SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa
+            FROM NPA_STMT
+            {where_branch}
+            GROUP BY NPA_STMT.BRANCH_CODE
+            ORDER BY npa DESC
+        """, params)
+        npa_row = cursor.fetchone()
+        if npa_row and npa_row[2] and npa_row[2] > 0:
+            branch_code_res = npa_row[0]
+            branch_name = npa_row[1][:15] if npa_row[1] else "Unknown"
+            notifications.append({
+                "id": 1,
+                "type": "warning",
+                "title": "High NPA Alert",
+                "time": "Just now",
+                "message": f"Branch {branch_name} has the highest NPA standing at ₹{npa_row[2]:,.2f}.",
+                "action": "modal",
+                "modal_type": "npa",
+                "branch_code": branch_code_res
+            })
+            
+        # 2. Inactive/Closed Accounts
+        cursor.execute(f"SELECT COUNT(*) FROM ACCOUNT_CLOSED_REPORT {where_branch}", params)
+        closed_accounts = cursor.fetchone()
+        if closed_accounts and closed_accounts[0] > 0:
+            notifications.append({
+                "id": 2,
+                "type": "info",
+                "title": "Account Closures",
+                "time": "Recent",
+                "message": f"There are {closed_accounts[0]} recently closed accounts recorded.",
+                "action": "modal",
+                "modal_type": "closed",
+                "branch_code": branch_code if branch_code != "ALL" else "ALL"
+            })
+            
+        # 3. Data Sync Status
+        notifications.append({
+            "id": 3,
+            "type": "success",
+            "title": "Data Sync Completed",
+            "time": "Today",
+            "message": "The MIS data upload has been processed successfully and is up-to-date."
+        })
+        
+    except Exception as e:
+        print(f"Error fetching notifications: {e}")
+    finally:
+        conn.close()
+        
+    return notifications
 
 # ==========================================
 # 0. Branches List
@@ -1311,6 +1391,69 @@ def get_loan_type_branches(product_name: str, branch_code: str = "ALL", period: 
     except:
         data = []
     conn.close()
+    return data
+
+# ==========================================
+# Trend Chart Data (Loans vs Deposits over time)
+# ==========================================
+@app.get("/api/trend-data")
+def get_trend_data(branch_code: str = "ALL", period: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    where_loan, params_loan = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET")
+    where_dep, params_dep = get_date_filter_sql(period, "DEPOSITS_BALANCE_FILE_DEPD0586")
+    
+    if branch_code != "ALL":
+        where_loan += " AND BRANCH_CODE = ?" if "WHERE" in where_loan else " WHERE BRANCH_CODE = ?"
+        params_loan.append(branch_code)
+        
+        where_dep += " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
+        params_dep.append(branch_code)
+        
+    try:
+        # Group loans by date
+        cursor.execute(f"""
+            SELECT CONVERT(VARCHAR, CONVERT(DATE, PROC_DATE, 103), 23) as dte, SUM(TRY_CAST(DR_BALANCE AS FLOAT))
+            FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
+            {where_loan}
+            GROUP BY CONVERT(VARCHAR, CONVERT(DATE, PROC_DATE, 103), 23)
+        """, params_loan)
+        loan_rows = cursor.fetchall()
+        
+        # Group deposits by date
+        cursor.execute(f"""
+            SELECT CONVERT(VARCHAR, CONVERT(DATE, PROC_DATE, 103), 23) as dte, SUM(TRY_CAST(CURRENT_BALANCE AS FLOAT))
+            FROM DEPOSITS_BALANCE_FILE_DEPD0586
+            {where_dep}
+            GROUP BY CONVERT(VARCHAR, CONVERT(DATE, PROC_DATE, 103), 23)
+        """, params_dep)
+        dep_rows = cursor.fetchall()
+        
+        # Merge data by date
+        trends = {}
+        for r in loan_rows:
+            dte = r[0]
+            val = abs(r[1] or 0) / 100000  # Convert to Lakhs
+            if dte not in trends:
+                trends[dte] = {"name": dte, "Loans": 0, "Deposits": 0}
+            trends[dte]["Loans"] = val
+            
+        for r in dep_rows:
+            dte = r[0]
+            val = abs(r[1] or 0) / 100000  # Convert to Lakhs
+            if dte not in trends:
+                trends[dte] = {"name": dte, "Loans": 0, "Deposits": 0}
+            trends[dte]["Deposits"] = val
+            
+        # Sort by date
+        data = sorted(list(trends.values()), key=lambda x: x["name"])
+    except Exception as e:
+        print(f"Error fetching trend data: {e}")
+        data = []
+    finally:
+        conn.close()
+        
     return data
 
 @app.get("/api/reports")

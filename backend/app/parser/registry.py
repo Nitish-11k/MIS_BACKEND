@@ -12,11 +12,13 @@ from app.parser.formats import gend1012_prt2, dep_shadow_file, glcc_wise_bal_rep
 from app.parser.formats import npa_stmt
 from app.parser.formats import account_opened_report, account_closed_report
 from app.parser.formats import id_users_logged_no_transactions_lond2482, id_users_terminals_not_logged_lond2482
+from app.parser.formats import listof_npa_accounts_lond2572
 
 REGISTRY = {
     "ACTCLS-01": account_closed_report.parse,
     "ACTOPN-01": account_opened_report.parse,
     "AU0035-01": account_alteration.parse,
+    "BR2572-01": listof_npa_accounts_lond2572.parse,
     "GL7046-01": bal_in_gl_acc_glcc_wise_det.parse,
     "GL7044-01": bal_in_loan_acc_glcc_wise_det.parse,
     "GL7044-02": bal_in_loan_acc_glcc_wise_sum.parse,
@@ -36,8 +38,8 @@ REGISTRY = {
     "BR2388-01": drawing_power_lond2388.parse,
     "IN0670-01": exception_report_depd0670.parse,
     "IN0650-01": exception_report_for_interest_rates_variation_depd0650.parse,
-    "GL1012-02": gend1012_prt.parse,
-    "GL1012-01": gend1012_prt2.parse,
+    "GL1012-01": gend1012_prt.parse,
+    "GL1012-02": gend1012_prt2.parse,
     "shadow_file": dep_shadow_file.parse,
     "GL7043-01": glcc_wise_bal_rep.parse,
     "GL7043-02": glcc_wise_sum_rep.parse,
