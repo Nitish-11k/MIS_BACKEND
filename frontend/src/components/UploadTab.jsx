@@ -281,6 +281,51 @@ const UploadTab = () => {
   };
 
   // ============================================================
+  // SINGLE FILE UPLOAD
+  // ============================================================
+
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setErrorMsg('');
+    setSuccessMsg('');
+    
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
+
+    try {
+      setScanState('SCANNING');
+      const response = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      setScanState('IDLE');
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to upload files.');
+      }
+
+      setSuccessMsg(`Successfully processed ${files.length} file(s).`);
+      
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('File upload error:', error);
+      setScanState('IDLE');
+      setErrorMsg(error.message || 'Network error while uploading files.');
+    }
+  };
+
+  // ============================================================
   // RESET SCAN
   // ============================================================
 
@@ -912,6 +957,41 @@ const UploadTab = () => {
 
             Example:
             C:\MIS_TOOL\20250425\20250425
+          </div>
+          
+          <div style={{ marginTop: '20px', borderTop: '1px solid #E2E8F0', paddingTop: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+             <div style={{ fontSize: '13px', color: '#334155', fontWeight: '600' }}>Or upload specific file(s):</div>
+             <input
+               type="file"
+               multiple
+               ref={fileInputRef}
+               style={{ display: 'none' }}
+               onChange={handleFileUpload}
+               accept=".txt,.gz"
+             />
+             <button
+               type="button"
+               onClick={() => fileInputRef.current?.click()}
+               disabled={isRunning || isScanning}
+               style={{
+                 height: '38px',
+                 padding: '0 15px',
+                 display: 'flex',
+                 alignItems: 'center',
+                 gap: '7px',
+                 borderRadius: '8px',
+                 border: '1px solid #CBD5E1',
+                 background: '#FFFFFF',
+                 color: '#334155',
+                 fontSize: '13px',
+                 fontWeight: '600',
+                 cursor: isRunning || isScanning ? 'not-allowed' : 'pointer',
+                 opacity: isRunning || isScanning ? 0.6 : 1,
+               }}
+             >
+               <UploadCloud size={16} color="#2563EB" />
+               Select File(s)
+             </button>
           </div>
 
           {/* Error */}

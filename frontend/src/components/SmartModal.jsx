@@ -413,7 +413,7 @@ const SmartModal = ({ type, branchCode, period, onClose }) => {
         position: 'fixed',
         inset: 0,
         background: 'rgba(15, 23, 42, 0.62)',
-        zIndex: 1000,
+        zIndex: 10000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

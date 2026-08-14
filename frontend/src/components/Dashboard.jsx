@@ -25,6 +25,7 @@ const Dashboard = () => {
   const [branchNpaData, setBranchNpaData] = useState([]);
   const [barChartData, setBarChartData] = useState([]);
   const [pieData, setPieData] = useState([]);
+  const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -48,8 +49,9 @@ const Dashboard = () => {
       fetch(`http://localhost:8000/api/account-metrics?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
       fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json()),
       fetch(`http://localhost:8000/api/productwise-summary?branch_code=${selectedBranch}`).then(res => res.json()),
-      fetch(`http://localhost:8000/api/deposits-by-type?branch_code=${selectedBranch}`).then(res => res.json())
-    ]).then(([kpiSum, accMetrics, npaData, prodData, depData]) => {
+      fetch(`http://localhost:8000/api/deposits-by-type?branch_code=${selectedBranch}`).then(res => res.json()),
+      fetch(`http://localhost:8000/api/trend-data?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json())
+    ]).then(([kpiSum, accMetrics, npaData, prodData, depData, trendDataRes]) => {
       // Overriding with mockup data if backend doesn't return high enough values to match the screenshots
       setKpiData({
         total_deposits: kpiSum.total_deposits || 0,
@@ -67,6 +69,8 @@ const Dashboard = () => {
       
       const totalDep = Array.isArray(depData) ? depData.reduce((acc, curr) => acc + (curr.value || 0), 0) : 1;
       setPieData(Array.isArray(depData) && depData.length > 0 ? depData.slice(0, 5).map(d => ({ name: d.name.substring(0, 12), value: Math.round(((d.value||0) / totalDep) * 100) })) : []);
+      
+      setTrendData(Array.isArray(trendDataRes) ? trendDataRes : []);
       
       setLoading(false);
     }).catch(err => {
@@ -149,6 +153,7 @@ const Dashboard = () => {
           selectedBranch={selectedBranch} setSelectedBranch={setSelectedBranch}
           selectedPeriod={selectedPeriod} setSelectedPeriod={setSelectedPeriod}
           exactDate={exactDate} setExactDate={setExactDate}
+          setActiveModal={setActiveModal}
         />
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -159,6 +164,7 @@ const Dashboard = () => {
               branchNpaData={branchNpaData}
               barChartData={barChartData}
               pieData={pieData}
+              trendData={trendData}
               setActiveModal={setActiveModal}
             />
           )}

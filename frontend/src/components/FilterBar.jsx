@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Bell, X, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const FilterBar = ({
@@ -8,15 +8,25 @@ const FilterBar = ({
   selectedPeriod,
   setSelectedPeriod,
   exactDate,
-  setExactDate
+  setExactDate,
+  setActiveModal
 }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   
-  const notifications = [
-    { id: 1, type: 'success', title: 'Data Sync Completed', time: '10 mins ago', message: 'The date-wise upload for 12 Aug 2026 was processed successfully.' },
-    { id: 2, type: 'warning', title: 'High NPA Alert', time: '2 hours ago', message: 'Branch 00002 has exceeded the NPA threshold by 15%.' },
-    { id: 3, type: 'info', title: 'System Maintenance', time: '5 hours ago', message: 'Scheduled MIS downtime at 2:00 AM IST on Sunday.' }
-  ];
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/api/notifications?branch_code=${selectedBranch}`);
+        const data = await response.json();
+        setNotifications(data);
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+      }
+    };
+    fetchNotifications();
+  }, [selectedBranch]);
+
   return (
     <div className="dashboard-header sticky-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 32px 16px 32px', borderBottom: '1px solid #E5E7EB', background: '#FFFFFF', position: 'sticky', top: 0, zIndex: 100 }}>
       <div className="header-title-section">
@@ -81,18 +91,14 @@ const FilterBar = ({
             style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', padding: '10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <Bell size={18} color="#4B5563" />
-            <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              3
-            </span>
+            {notifications.length > 0 && (
+              <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {notifications.length}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Apply Button */}
-        <button 
-          style={{ background: '#F97316', color: '#fff', border: 'none', padding: '9px 24px', borderRadius: '8px', fontWeight: '500', fontSize: '14px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-        >
-          Apply
-        </button>
       </div>
 
       {/* Slide-in Notification Panel */}
@@ -125,20 +131,53 @@ const FilterBar = ({
         </div>
         
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {notifications.length === 0 && (
+            <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '40px 0', fontSize: '13px' }}>
+              No notifications at this time.
+            </div>
+          )}
           {notifications.map(notif => (
-            <div key={notif.id} style={{ padding: '16px', borderRadius: '8px', border: '1px solid #E5E7EB', background: notif.type === 'warning' ? '#FEF2F2' : (notif.type === 'success' ? '#F0FDF4' : '#F8FAFC') }}>
+            <div 
+              key={notif.id} 
+              onClick={() => {
+                if (notif.action === 'modal' && notif.modal_type) {
+                  if (notif.branch_code && notif.branch_code !== 'ALL') {
+                    setSelectedBranch(notif.branch_code);
+                  }
+                  setActiveModal(notif.modal_type);
+                  setIsNotificationOpen(false);
+                }
+              }}
+              style={{ 
+                padding: '16px', 
+                borderRadius: '8px', 
+                border: notif.action === 'modal' ? '1px solid #F97316' : '1px solid #E5E7EB', 
+                background: notif.type === 'warning' ? '#FEF2F2' : (notif.type === 'success' ? '#F0FDF4' : '#F8FAFC'),
+                cursor: notif.action === 'modal' ? 'pointer' : 'default',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { if(notif.action==='modal') { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(249,115,22,0.15)'; } }}
+              onMouseLeave={(e) => { if(notif.action==='modal') { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; } }}
+            >
               <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <div style={{ marginTop: '2px' }}>
                   {notif.type === 'success' && <CheckCircle size={16} color="#16A34A" />}
                   {notif.type === 'warning' && <AlertTriangle size={16} color="#DC2626" />}
                   {notif.type === 'info' && <Info size={16} color="#0284C7" />}
                 </div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{notif.title}</span>
                   </div>
                   <div style={{ fontSize: '13px', color: '#4B5563', lineHeight: '1.4' }}>{notif.message}</div>
-                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '8px', fontWeight: '500' }}>{notif.time}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: '500' }}>{notif.time}</span>
+                    {notif.action === 'modal' && (
+                      <span style={{ fontSize: '11px', color: '#F97316', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        View Details →
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
