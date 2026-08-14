@@ -13,6 +13,8 @@ from app.parser.formats import npa_stmt
 from app.parser.formats import account_opened_report, account_closed_report
 from app.parser.formats import id_users_logged_no_transactions_lond2482, id_users_terminals_not_logged_lond2482
 from app.parser.formats import listof_npa_accounts_lond2572
+from app.parser.formats import agewise_report_of_sys_susp_gend7053, advicefortd
+from app.parser.formats import loans_sanction_letter
 
 REGISTRY = {
     "ACTCLS-01": account_closed_report.parse,
@@ -66,4 +68,7 @@ REGISTRY = {
     "CIFD0528": interbranch_transactions_cifd0528.parse,
     "BR2482-02": id_users_logged_no_transactions_lond2482.parse,
     "BR2482-03": id_users_terminals_not_logged_lond2482.parse,
+    "GL7053-01": agewise_report_of_sys_susp_gend7053.parse,
+    "ADVICEFORTD": advicefortd.parse,
+    "LOANS_SANCTION_LETTER": loans_sanction_letter.parse,
 }
