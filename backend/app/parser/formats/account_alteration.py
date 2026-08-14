@@ -33,6 +33,7 @@ def parse(raw_lines):
     # Exclude any trailing pure dash lines from data_lines
     data_lines = [l for l in data_lines if not set(l.replace(" ", "")) <= {"|", "-", "+"}]
 
+
     # Find the pipes in main_sep
     data_pipes = [i for i, c in enumerate(main_sep) if c == "|" or c == "+"]
     if len(data_pipes) < 2:
