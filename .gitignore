@@ -6,14 +6,19 @@ data/samples/*
 !data/samples/.gitkeep
 .env
 
-# Reports
+# Reports and Data
 reports/
 report/
 *.pdf
 *.csv
 *.xlsx
 *.xls
-*report*
+*.txt.gz
+data/incoming/
+data/reports/
+backend/data/uploads/
+backend/data/extracted/
+backend/data/excel/
 
 # GX files
 gx/
