@@ -5,3 +5,24 @@ __pycache__/
 data/samples/*
 !data/samples/.gitkeep
 .env
+
+# Reports
+reports/
+report/
+*.pdf
+*.csv
+*.xlsx
+*.xls
+*report*
+
+# GX files
+gx/
+*.gx
+
+# Informational files
+*.txt
+*.md
+*.log
+*.info
+!requirements.txt
+!README.md
