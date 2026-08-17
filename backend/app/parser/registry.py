@@ -14,7 +14,7 @@ from app.parser.formats import account_opened_report, account_closed_report
 from app.parser.formats import id_users_logged_no_transactions_lond2482, id_users_terminals_not_logged_lond2482
 from app.parser.formats import listof_npa_accounts_lond2572
 from app.parser.formats import agewise_report_of_sys_susp_gend7053, advicefortd
-from app.parser.formats import loans_sanction_letter
+from app.parser.formats import loans_sanction_letter, details_of_inventory_recd_cfpd0305, system_transactions_report_depd0903
 from app.parser.formats import maturity_list_depd0623, overdue_notice_lond2384, inventory_report, int_paid_proj
 
 REGISTRY = {
@@ -76,4 +76,7 @@ REGISTRY = {
     "OVERDUE_NOTICE": overdue_notice_lond2384.parse,
     "VP7634": inventory_report.parse,
     "DEPD637T": int_paid_proj.parse,
+    "SY0305-01": details_of_inventory_recd_cfpd0305.parse,
+    "depd0903": system_transactions_report_depd0903.parse,
+    "IN0903": system_transactions_report_depd0903.parse,
 }
