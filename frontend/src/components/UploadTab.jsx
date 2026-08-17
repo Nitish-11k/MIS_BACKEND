@@ -48,6 +48,7 @@ const UploadTab = () => {
   const [isUploadingSingle, setIsUploadingSingle] = useState(false);
 
   const logsEndRef = useRef(null);
+  const logsContainerRef = useRef(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
   // ============================================================
@@ -102,11 +103,8 @@ const UploadTab = () => {
   // ============================================================
 
   useEffect(() => {
-    if (autoScroll && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-      });
+    if (autoScroll && logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
   }, [status.progress_logs, autoScroll]);
 
@@ -1649,6 +1647,7 @@ const UploadTab = () => {
 
           {/* Logs */}
           <div
+            ref={logsContainerRef}
             onScroll={(e) => {
               const { scrollTop, scrollHeight, clientHeight } = e.target;
               // If we are within 20px of the bottom, enable auto-scroll, else disable it
