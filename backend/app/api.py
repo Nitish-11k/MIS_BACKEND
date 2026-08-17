@@ -354,7 +354,9 @@ def get_notifications(branch_code: str = "ALL"):
         })
         
     except Exception as e:
-        print(f"Error fetching notifications: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error fetching notifications: {e}")
     finally:
         conn.close()
         
@@ -380,7 +382,9 @@ def get_branches():
         for row in rows:
             branches.append({"code": row[0].strip(), "name": row[1].strip() if row[1] else "Unknown"})
     except Exception as e:
-        print(f"Skipping branches fetch: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Skipping branches fetch: {e}")
     finally:
         conn.close()
     
@@ -411,7 +415,9 @@ def get_branch_comparison(branch_code: str = "ALL", period: str = "ALL"):
         rows = cursor.fetchall()
         data = [{"name": r[0][:15] if r[0] else "Unknown", "deposits": abs(r[1] or 0)} for r in rows]
     except Exception as e:
-        print(f"Error: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error: {e}")
         data = []
     conn.close()
     return data
@@ -440,7 +446,9 @@ def get_opened_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
         rows = cursor.fetchall()
         data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
     except Exception as e:
-        print(f"Error calculating branch-wise opened: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error calculating branch-wise opened: {e}")
         data = []
     conn.close()
     return data
@@ -469,7 +477,9 @@ def get_closed_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
         rows = cursor.fetchall()
         data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
     except Exception as e:
-        print(f"Error calculating branch-wise closed: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error calculating branch-wise closed: {e}")
         data = []
     conn.close()
     return data
@@ -514,7 +524,9 @@ def get_total_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
         rows = cursor.fetchall()
         data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
     except Exception as e:
-        print(f"Error calculating total branch-wise: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error calculating total branch-wise: {e}")
         data = []
     conn.close()
     return data
@@ -550,7 +562,7 @@ def get_deposit_branch_wise(
         branch_condition = ""
 
         if branch_code != "ALL":
-            branch_condition = " AND BRANCH_CODE = ?"
+            branch_condition = " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
             params_dep.append(branch_code)
 
         query = f"""
@@ -635,7 +647,9 @@ def get_deposit_branch_wise(
         return data
 
     except Exception as e:
-        print(f"Error calculating branch-wise deposits: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error calculating branch-wise deposits: {e}")
         return []
 
     finally:
@@ -679,7 +693,7 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL"):
 
         branch_condition = ""
         if branch_code != "ALL":
-            branch_condition = " AND BRANCH_CODE = ?"
+            branch_condition = " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
             params_dep.append(branch_code)
 
         # We first select one record per ACCOUNT_NUMBER.
@@ -836,7 +850,9 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL"):
             data["branches_reporting"] = 1
 
     except Exception as e:
-        print(f"Error calculating KPIs: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error calculating KPIs: {e}")
 
     finally:
         conn.close()
@@ -1325,18 +1341,11 @@ def get_loan_npa_summary(branch_code: str = "ALL"):
     except:
         total_npa_outstanding = 0
         
-    try:
-        cursor.execute(f"SELECT SUM(TRY_CAST(INCA AS FLOAT)) FROM NPA_STMT {where_clause}", params)
-        npa_covered = cursor.fetchone()[0] or 0
-    except:
-        npa_covered = 0
-        
     conn.close()
     
     return {
         "total_loans": abs(total_loans),
-        "total_npa": abs(total_npa_outstanding),
-        "npa_covered": abs(npa_covered)
+        "total_npa": abs(total_npa_outstanding)
     }
 
 @app.get("/api/npa-branch-wise")
@@ -1360,17 +1369,37 @@ def get_npa_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
         cursor.execute(f"""
             SELECT 
                 COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = NPA_STMT.BRANCH_CODE), NPA_STMT.BRANCH_CODE) as BRANCH_NAME,
-                SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa, 
-                SUM(TRY_CAST(INCA AS FLOAT)) as covered
+                SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa
             FROM NPA_STMT
             {where_npa}
             GROUP BY NPA_STMT.BRANCH_CODE
             ORDER BY npa DESC
         """, params_npa)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "NPA": abs(r[1] or 0), "Covered": abs(r[2] or 0)} for r in rows]
+        data = [{"name": r[0][:15] if r[0] else "Unknown", "NPA": abs(r[1] or 0)} for r in rows]
     except Exception as e:
-        print(f"Error in NPA: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error in NPA: {e}")
+        data = []
+    conn.close()
+    return data
+
+@app.get("/api/branch-network")
+def get_branch_network():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT ID, HEAD_OFFICE, REGIONAL_OFFICE, BRANCH_NAME, DISTRICT, ADDRESS, CONTACT_NO
+            FROM BRANCH_NETWORK
+            ORDER BY REGIONAL_OFFICE, BRANCH_NAME
+        """)
+        columns = [column[0] for column in cursor.description]
+        rows = cursor.fetchall()
+        data = [dict(zip(columns, row)) for row in rows]
+    except Exception as e:
+        print(f"Error fetching branch network: {e}")
         data = []
     conn.close()
     return data
@@ -1511,7 +1540,9 @@ def get_trend_data(branch_code: str = "ALL", period: str = "ALL"):
         # Sort by date
         data = sorted(list(trends.values()), key=lambda x: x["name"])
     except Exception as e:
-        print(f"Error fetching trend data: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error fetching trend data: {e}")
         data = []
     finally:
         conn.close()
@@ -1687,7 +1718,9 @@ def get_account_metrics(branch_code: str = "ALL", period: str = "ALL"):
         if res: data["closed"] = res[0]
         
     except Exception as e:
-        print(f"Error getting account metrics: {e}")
+        import pyodbc
+        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
+            print(f"Error getting account metrics: {e}")
         
     conn.close()
     return data

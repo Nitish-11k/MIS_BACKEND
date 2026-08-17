@@ -13,7 +13,7 @@ const NpaManagementTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
     fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`)
       .then(res => res.json())
       .then(data => {
-        setNpaData(Array.isArray(data) ? data.map(d => ({ ...d, NPA: (d.NPA||0)/100000, Covered: (d.Covered||0)/100000 })) : []);
+        setNpaData(Array.isArray(data) ? data.map(d => ({ ...d, NPA: (d.NPA||0)/100000 })) : []);
         setLoading(false);
       })
       .catch(err => {
@@ -38,7 +38,7 @@ const NpaManagementTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
             <div>
               <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111827' }}>NPA Defaulting Branches</div>
-              <div style={{ fontSize: '13px', color: '#6B7280' }}>Outstanding vs Covered (₹ Lakhs)</div>
+              <div style={{ fontSize: '13px', color: '#6B7280' }}>Outstanding NPA (₹ Lakhs)</div>
             </div>
             <div style={{ display: 'flex', background: '#F3F4F6', borderRadius: '20px', padding: '4px', cursor: 'pointer' }}>
               <div onClick={() => setSortOrder('top')} style={{ background: sortOrder === 'top' ? '#F97316' : 'transparent', color: sortOrder === 'top' ? '#fff' : '#6B7280', padding: '4px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '500' }}>Top 10</div>
@@ -53,7 +53,7 @@ const NpaManagementTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                   <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} width={120} />
                   <Tooltip cursor={{ fill: '#F9FAFB' }} />
                   <Bar dataKey="NPA" fill="#EF4444" barSize={12} radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="Covered" fill="#10B981" barSize={12} radius={[0, 4, 4, 0]} />
+
                 </BarChart>
               </ResponsiveContainer>
             )}

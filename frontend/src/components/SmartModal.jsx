@@ -37,7 +37,7 @@ const toNumber = (value) => {
 
   const number = Number(cleaned);
 
-  return Number.isFinite(number) ? number : 0;
+  return Number.isFinite(number) ? Math.abs(number) : 0;
 };
 
 const formatINR = (value) => {
