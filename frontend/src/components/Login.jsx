@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { User, Lock, Building2, Mail, Landmark, MapPin, KeyRound, ArrowRight, ChevronLeft } from 'lucide-react';
+import { 
+  User, Lock, Building2, Mail, Landmark, MapPin, KeyRound, 
+  ArrowRight, ChevronLeft, Shield, Briefcase, Coins, 
+  Wallet, CreditCard, Vault, PiggyBank, CircleDollarSign,
+  TrendingUp, BarChart3, PieChart
+} from 'lucide-react';
 
 const Login = ({ onLogin }) => {
   const [mode, setMode] = useState('LOGIN'); // LOGIN, SIGNUP, OTP
@@ -42,7 +47,6 @@ const Login = ({ onLogin }) => {
     e.preventDefault();
     const otpValue = otp.join('');
     if (otpValue.length === 6) {
-      // Mock successful OTP
       onLogin();
     } else {
       setError('Please enter complete OTP');
@@ -50,37 +54,67 @@ const Login = ({ onLogin }) => {
   };
 
   const handleOtpChange = (index, value) => {
-    if (value.length > 1) return; // Only 1 digit per input
+    if (value.length > 1) return;
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-    
-    // Auto focus next
     if (value && index < 5) {
       const nextInput = document.getElementById(`otp-${index + 1}`);
       if (nextInput) nextInput.focus();
     }
   };
 
+  // Background floating icons pushed to extreme edges (white space)
+  const bgIcons = [
+    { Icon: Shield, top: '12%', left: '8%', size: 56 },
+    { Icon: Coins, top: '15%', left: '92%', size: 64 },
+    { Icon: Wallet, top: '85%', left: '10%', size: 60 },
+    { Icon: Landmark, top: '88%', left: '90%', size: 72 },
+    { Icon: Briefcase, top: '45%', left: '5%', size: 48 },
+    { Icon: CreditCard, top: '55%', left: '95%', size: 50 },
+    { Icon: PiggyBank, top: '8%', left: '45%', size: 50 },
+    { Icon: CircleDollarSign, top: '92%', left: '55%', size: 60 },
+    { Icon: TrendingUp, top: '65%', left: '6%', size: 55 },
+    { Icon: BarChart3, top: '75%', left: '96%', size: 45 },
+    { Icon: PieChart, top: '25%', left: '4%', size: 55 }
+  ];
+
   return (
     <div style={{
+      position: 'relative',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
       backgroundColor: '#F3F4F6',
-      fontFamily: "'Inter', sans-serif"
+      fontFamily: "'Inter', sans-serif",
+      overflow: 'hidden'
     }}>
-      {/* Outer rounded container */}
+      {/* Floating Background Icons */}
+      {bgIcons.map((item, i) => (
+        <div key={i} style={{
+          position: 'absolute',
+          top: item.top,
+          left: item.left,
+          opacity: 0.12,
+          color: '#0F172A',
+          transform: 'translate(-50%, -50%)'
+        }}>
+          <item.Icon size={item.size} strokeWidth={1.5} />
+        </div>
+      ))}
+
+      {/* Outer rounded container (Shrinked) */}
       <div style={{
         position: 'relative',
-        width: '1000px',
-        height: '650px',
+        width: '900px', // Shrinked from 1000px
+        height: '600px', // Shrinked from 650px
         maxWidth: '95%',
         borderRadius: '24px',
         overflow: 'hidden',
         boxShadow: 'var(--shadow-premium, 0 20px 50px rgba(0,0,0,0.15))',
         border: '1px solid #E2E8F0',
+        zIndex: 10
       }}>
         {/* Background Image inside container */}
         <div style={{
@@ -99,9 +133,9 @@ const Login = ({ onLogin }) => {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: '420px',
+          width: '400px',
           backgroundColor: '#FFFFFF',
-          padding: '50px 40px 40px',
+          padding: '45px 35px 35px',
           borderRadius: '16px',
           boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
           display: 'flex',
@@ -111,11 +145,11 @@ const Login = ({ onLogin }) => {
           {/* Overlapping Bank Logo at Top Center */}
           <div style={{
             position: 'absolute',
-            top: '-40px',
+            top: '-35px',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '80px',
-            height: '80px',
+            width: '70px',
+            height: '70px',
             backgroundColor: '#0F172A',
             borderRadius: '50%',
             display: 'flex',
@@ -124,19 +158,19 @@ const Login = ({ onLogin }) => {
             boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
             border: '4px solid #FFFFFF'
           }}>
-            <Building2 size={36} color="#D4AF37" />
+            <Building2 size={30} color="#D4AF37" />
           </div>
 
           <h2 style={{
-            margin: '10px 0 8px',
-            fontSize: '24px',
+            margin: '15px 0 8px',
+            fontSize: '22px',
             fontWeight: '700',
             color: '#0F172A',
             fontFamily: "'Playfair Display', serif"
           }}>
             APEX BANKING MIS
           </h2>
-          <p style={{ color: '#64748B', fontSize: '13px', marginBottom: '30px', fontWeight: '500', textAlign: 'center' }}>
+          <p style={{ color: '#64748B', fontSize: '13px', marginBottom: '25px', fontWeight: '500', textAlign: 'center' }}>
             {mode === 'LOGIN' && "Secure Administrator Login"}
             {mode === 'SIGNUP' && "Create your corporate account"}
             {mode === 'OTP' && "Verify your identity"}
@@ -176,7 +210,7 @@ const Login = ({ onLogin }) => {
 
                 <button
                   type="submit"
-                  style={{ width: '100%', backgroundColor: '#0F172A', color: '#D4AF37', border: 'none', padding: '14px', borderRadius: '6px', fontSize: '14px', fontWeight: '700', letterSpacing: '1px', cursor: 'pointer', marginBottom: '24px', transition: 'background 0.2s' }}
+                  style={{ width: '100%', backgroundColor: '#0F172A', color: '#D4AF37', border: 'none', padding: '14px', borderRadius: '6px', fontSize: '14px', fontWeight: '700', letterSpacing: '1px', cursor: 'pointer', marginBottom: '20px', transition: 'background 0.2s' }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#1E293B'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = '#0F172A'}
                 >
@@ -222,7 +256,7 @@ const Login = ({ onLogin }) => {
 
                 <button
                   type="submit"
-                  style={{ width: '100%', backgroundColor: '#0F172A', color: '#D4AF37', border: 'none', padding: '14px', borderRadius: '6px', fontSize: '14px', fontWeight: '700', letterSpacing: '1px', cursor: 'pointer', marginBottom: '20px', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  style={{ width: '100%', backgroundColor: '#0F172A', color: '#D4AF37', border: 'none', padding: '14px', borderRadius: '6px', fontSize: '14px', fontWeight: '700', letterSpacing: '1px', cursor: 'pointer', marginBottom: '16px', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
                   PROCEED TO VERIFY <ArrowRight size={16} />
                 </button>
@@ -266,7 +300,7 @@ const Login = ({ onLogin }) => {
 
                 <button
                   type="submit"
-                  style={{ width: '100%', backgroundColor: '#0F172A', color: '#D4AF37', border: 'none', padding: '14px', borderRadius: '6px', fontSize: '14px', fontWeight: '700', letterSpacing: '1px', cursor: 'pointer', marginBottom: '20px', transition: 'background 0.2s' }}
+                  style={{ width: '100%', backgroundColor: '#0F172A', color: '#D4AF37', border: 'none', padding: '14px', borderRadius: '6px', fontSize: '14px', fontWeight: '700', letterSpacing: '1px', cursor: 'pointer', marginBottom: '16px', transition: 'background 0.2s' }}
                 >
                   VERIFY & REGISTER
                 </button>
