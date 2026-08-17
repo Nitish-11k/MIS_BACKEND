@@ -1045,57 +1045,7 @@ const UploadTab = () => {
             </button>
           </div>
 
-          {/* Helper text */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              marginTop: '9px',
-              fontSize: '11px',
-              color: '#94A3B8',
-            }}
-          >
-            <FileText size={13} />
 
-            Example:
-            C:\MIS_TOOL\20250425\20250425
-          </div>
-          
-          <div style={{ marginTop: '20px', borderTop: '1px solid #E2E8F0', paddingTop: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-             <div style={{ fontSize: '13px', color: '#334155', fontWeight: '600' }}>Or upload specific file(s):</div>
-             <input
-               type="file"
-               multiple
-               ref={fileInputRef}
-               style={{ display: 'none' }}
-               onChange={handleFileUpload}
-               accept=".txt,.gz"
-             />
-             <button
-               type="button"
-               onClick={() => fileInputRef.current?.click()}
-               disabled={isRunning || isScanning}
-               style={{
-                 height: '38px',
-                 padding: '0 15px',
-                 display: 'flex',
-                 alignItems: 'center',
-                 gap: '7px',
-                 borderRadius: '8px',
-                 border: '1px solid #CBD5E1',
-                 background: '#FFFFFF',
-                 color: '#334155',
-                 fontSize: '13px',
-                 fontWeight: '600',
-                 cursor: isRunning || isScanning ? 'not-allowed' : 'pointer',
-                 opacity: isRunning || isScanning ? 0.6 : 1,
-               }}
-             >
-               <UploadCloud size={16} color="#2563EB" />
-               Select File(s)
-             </button>
-          </div>
 
           {/* Error */}
           {errorMsg && (
