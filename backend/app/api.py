@@ -151,13 +151,13 @@ def scan_folder(req: UploadRequest):
         try:
             if filepath.endswith(".gz"):
                 with gzip.open(filepath, "rt", encoding="utf-8", errors="replace") as f:
-                    for _ in range(50):
+                    for _ in range(200):
                         line = f.readline()
                         if not line: break
                         lines.append(line)
             else:
                 with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                    for _ in range(50):
+                    for _ in range(200):
                         line = f.readline()
                         if not line: break
                         lines.append(line)

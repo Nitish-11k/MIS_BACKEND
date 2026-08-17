@@ -83,30 +83,62 @@ def parse(raw_lines):
         if any(ord(c) < 32 and c not in '\t' for c in stripped):
             continue
 
-        if not col_indices:
-            # Fallback if no dashes found
-            row = {"RAW_LINE": line.strip()[:200]}
+        custom_headers = [
+            "CREDIT_CASH", "CREDIT_CLEARING", "CREDIT_TRANSFER",
+            "ACCOUNT_NO", "CUSTOMER_NAME",
+            "DEBIT_CASH", "DEBIT_CLEARING", "DEBIT_TRANSFER",
+            "CHEQUENO", "MAKERID", "CHK1ID", "CHK2ID"
+        ]
+        
+        row = {}
+        # Parse dynamically because fixed offsets fail due to horizontal drift
+        import re
+        m = re.search(r'(\s+|^)(\d{12,20})(\s+)', line)
+        if m:
+            acc_val = m.group(2)
+            acc_idx = line.find(acc_val)
+            
+            left = line[:acc_idx]
+            right = line[acc_idx + len(acc_val):]
+            
+            credits = [x.strip() for x in left.split() if x.strip()]
+            row["CREDIT_TRANSFER"] = credits[-1] if len(credits) >= 1 else ""
+            row["CREDIT_CLEARING"] = credits[-2] if len(credits) >= 2 else ""
+            row["CREDIT_CASH"] = credits[-3] if len(credits) >= 3 else ""
+            
+            row["ACCOUNT_NO"] = acc_val
+            
+            # The right side is: [Customer Name] [Debit Cash] [Debit Clearing] [Debit Transfer] [Cheque] [Maker] [Chk1] [Chk2]
+            # Since Debits are numbers with commas/decimals, and IDs are 3 digits, we can find them.
+            # But the Customer name can have spaces.
+            
+            # Since everything after customer name is generally numbers, we can use fixed offsets on the original line for them:
+            dr_cash = line[120:142].strip() if len(line) > 120 else ""
+            dr_clr = line[142:155].strip() if len(line) > 142 else ""
+            dr_trf = line[155:177].strip() if len(line) > 155 else ""
+            chq = line[177:182].strip() if len(line) > 177 else ""
+            
+            ids_str = line[182:]
+            ids = [x.strip() for x in ids_str.split() if x.strip()]
+            maker = ids[-3] if len(ids) >= 3 else ""
+            chk1 = ids[-2] if len(ids) >= 2 else ids[-1] if len(ids) == 1 else ""
+            chk2 = ids[-1] if len(ids) >= 2 else ""
+            
+            row["DEBIT_CASH"] = dr_cash
+            row["DEBIT_CLEARING"] = dr_clr
+            row["DEBIT_TRANSFER"] = dr_trf
+            row["CHEQUENO"] = chq
+            row["MAKERID"] = maker
+            row["CHK1ID"] = chk1
+            row["CHK2ID"] = chk2
+            
+            # Customer name is what is left between account and debit cash
+            cust_name_end = min(120, len(line))
+            cust_name = line[acc_idx + len(acc_val) : cust_name_end].strip()
+            row["CUSTOMER_NAME"] = cust_name
         else:
-            row = {}
-            used_cols = set()
-            for idx, (s, e) in enumerate(col_indices):
-                col_name = headers[idx] if idx < len(headers) else f"COL_{idx}"
-                # sanitize column name
-                col_name = "".join(c for c in col_name if c.isalnum() or c == '_').upper()
-                if not col_name: col_name = f"COL_{idx}"
-                
-                # Disambiguate duplicate column names (like CASH vs CASH_1)
-                original_col_name = col_name
-                counter = 1
-                while col_name in used_cols:
-                    col_name = f"{original_col_name}_{counter}"
-                    counter += 1
-                used_cols.add(col_name)
-                
-                val = line[s:e].strip()
-                # strip weird symbol artifacts inside values
-                val = val.replace('=>', '').replace('<-', '').strip('|').strip()
-                row[col_name] = val
+            # Skip summary rows and formatting lines that don't have an account number
+            continue
             
         row["REPORT_ID"] = metadata.get("REPORT_ID", "")
         row["BRANCH_CODE"] = metadata.get("BRANCH_CODE", "")
@@ -114,33 +146,19 @@ def parse(raw_lines):
         row["PROC_DATE"] = metadata.get("PROC_DATE", "")
         
         # basic empty check
-        if len(row) > 4:
-            first_val = list(row.values())[0]
-            if not first_val or "TOTAL" in str(first_val).upper():
-                continue
-                
+        if not any(v for v in row.values() if v and str(v).upper() not in ["", "REPORT_ID", "BRANCH_CODE", "BRANCH_NAME", "PROC_DATE"]):
+            continue
+            
+        if row.get("ACCOUNT_NO") and "TOTAL" in str(row.get("ACCOUNT_NO")).upper():
+            continue
+            
         rows.append(row)
 
     if not rows:
         # Schema only row
         row = {}
-        if col_indices:
-            used_cols = set()
-            for idx, (s, e) in enumerate(col_indices):
-                col_name = headers[idx] if idx < len(headers) else f"COL_{idx}"
-                col_name = "".join(c for c in col_name if c.isalnum() or c == '_').upper()
-                if not col_name: col_name = f"COL_{idx}"
-                
-                original_col_name = col_name
-                counter = 1
-                while col_name in used_cols:
-                    col_name = f"{original_col_name}_{counter}"
-                    counter += 1
-                used_cols.add(col_name)
-                
-                row[col_name] = ""
-        else:
-            row["RAW_LINE"] = ""
+        for col_name in custom_headers:
+            row[col_name] = ""
             
         row["REPORT_ID"] = metadata.get("REPORT_ID", "")
         row["BRANCH_CODE"] = metadata.get("BRANCH_CODE", "")

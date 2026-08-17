@@ -1,4 +1,4 @@
-from app.parser.formats import interestratechangeloans_cfpd0337, irregular_excess_draw_lond2397cpc, list_of_npa_accounts, loansbalancefile_lond2390, loan_irregular_report, non_home_branch_cifd0363, probable_npa_report_lond2463, report_high_value_transactions, report_maturing_securities_lond2443, rupee_drawing_list_cfpd0388, supplimentary_control_gend7484, supplimentary_control_gend7516, supplimentary_report_gend7484, transfer_supplementary_gend7484, transfer_supplementary_gend7516, voucher_varification_report_cfpd0331, voucher_varification_report_cfpd0344, interbranch_transactions_cifd0528
+from app.parser.formats import interestratechangeloans_cfpd0337, irregular_excess_draw_lond2397cpc, list_of_npa_accounts, loansbalancefile_lond2390, loan_irregular_report, non_home_branch_cifd0363, probable_npa_report_lond2463, report_high_value_transactions, report_maturing_securities_lond2443, rupee_drawing_list_cfpd0388, supplimentary_control_gend7516, supplimentary_report_gend7484, transfer_supplementary_gend7516, voucher_varification_report_cfpd0331, voucher_varification_report_cfpd0344, interbranch_transactions_cifd0528
 from app.parser.formats import simple_fixed_width, pipe_delimited, account_alteration
 from app.parser.formats import bal_in_gl_acc_glcc_wise_det, bal_in_loan_acc_glcc_wise_det, bal_in_loan_acc_glcc_wise_sum, arrears_break_up_lond2498
 from app.parser.formats import bgl_txn_enquiry_gend0600, cc_od_balance_file_depd0580, coll_matured_sec_lond2444
@@ -16,6 +16,9 @@ from app.parser.formats import listof_npa_accounts_lond2572
 from app.parser.formats import agewise_report_of_sys_susp_gend7053, advicefortd
 from app.parser.formats import loans_sanction_letter, details_of_inventory_recd_cfpd0305, system_transactions_report_depd0903
 from app.parser.formats import maturity_list_depd0623, overdue_notice_lond2384, inventory_report, int_paid_proj
+from app.parser.formats import cheque_book_issue_order_casd0198, system_generated_transactions_lond2543
+from app.parser.formats import daily_branch_opend_accounts_nonwkit, audit_bgl_accounts_age_wise_break_up_gend0805
+from app.parser.formats import lien_marked_removal_depd0702, gl_outstanding_accnts_genm0808
 
 REGISTRY = {
     "ACTCLS-01": account_closed_report.parse,
@@ -59,11 +62,9 @@ REGISTRY = {
     "BR2599-01": report_high_value_transactions.parse,
     "BR2443-01": report_maturing_securities_lond2443.parse,
     "SY0388-01": rupee_drawing_list_cfpd0388.parse,
-    "GN7484": supplimentary_control_gend7484.parse,
-    "GN7516": supplimentary_control_gend7516.parse,
+    "GN7484": supplimentary_report_gend7484.parse,
     "GN7484_2": supplimentary_report_gend7484.parse,
-    "GN7484_3": transfer_supplementary_gend7484.parse,
-    "GN7516_2": transfer_supplementary_gend7516.parse,
+    "GN7516": supplimentary_control_gend7516.parse,
     "SY0331-01": voucher_varification_report_cfpd0331.parse,
     "SY0344-01": voucher_varification_report_cfpd0344.parse,
     "CIFD0528": interbranch_transactions_cifd0528.parse,
@@ -76,6 +77,13 @@ REGISTRY = {
     "OVERDUE_NOTICE": overdue_notice_lond2384.parse,
     "VP7634": inventory_report.parse,
     "DEPD637T": int_paid_proj.parse,
+    "CA0198-01": cheque_book_issue_order_casd0198.parse,
+    "BR2543-01": system_generated_transactions_lond2543.parse,
+    "IN0762-01": daily_branch_opend_accounts_nonwkit.parse,
+    "nonwkit": daily_branch_opend_accounts_nonwkit.parse,
+    "GL0805-01": audit_bgl_accounts_age_wise_break_up_gend0805.parse,
+    "IN0702-01": lien_marked_removal_depd0702.parse,
+    "GL0808-01": gl_outstanding_accnts_genm0808.parse,
     "SY0305-01": details_of_inventory_recd_cfpd0305.parse,
     "depd0903": system_transactions_report_depd0903.parse,
     "IN0903": system_transactions_report_depd0903.parse,
