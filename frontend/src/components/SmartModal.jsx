@@ -209,7 +209,50 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-const SmartModal = ({ type, branchCode, period, onClose }) => {
+const customTableStyles = {
+  headRow: {
+    style: {
+      backgroundColor: '#0F172A',
+      color: '#FFFFFF',
+      fontSize: '13px',
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      borderTopLeftRadius: '8px',
+      borderTopRightRadius: '8px',
+      borderBottom: 'none'
+    },
+  },
+  rows: {
+    style: {
+      fontSize: '13px',
+      color: '#334155',
+      backgroundColor: '#FFFFFF',
+      borderBottomColor: '#E2E8F0',
+      transition: 'all 0.2s ease',
+      '&:hover': {
+        backgroundColor: '#F8FAFC',
+        transform: 'translateY(-1px)',
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+        zIndex: 1,
+        position: 'relative',
+        cursor: 'pointer'
+      },
+    },
+    stripedStyle: {
+      backgroundColor: '#F8FAFC',
+    }
+  },
+  pagination: {
+    style: {
+      borderTop: '1px solid #E5E7EB',
+      fontSize: '13px',
+      color: '#64748B'
+    }
+  }
+};
+
+const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate, onClose }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -283,8 +326,15 @@ const SmartModal = ({ type, branchCode, period, onClose }) => {
       try {
         const params = new URLSearchParams({
           branch_code: branchCode || 'ALL',
-          period: period || 'ALL',
         });
+        if (startDate && endDate) {
+          params.append('start_date', startDate);
+          params.append('end_date', endDate);
+        } else if (startDate) {
+          params.append('start_date', startDate);
+        } else {
+          params.append('period', period || 'ALL');
+        }
 
         const response = await fetch(
           `${API_BASE}${config.endpoint}?${params.toString()}`,
@@ -581,16 +631,24 @@ const SmartModal = ({ type, branchCode, period, onClose }) => {
                 <div
                   style={{
                     background: '#fff',
-                    border: '1px solid #E5E7EB',
+                    border: '1px dashed #CBD5E1',
                     borderRadius: '12px',
                     minHeight: '400px',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#64748B',
+                    gap: '16px'
                   }}
                 >
-                  No data available for the selected branch and period.
+                  <div style={{ padding: '16px', background: '#F1F5F9', borderRadius: '50%' }}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '600', color: '#334155' }}>No data available</div>
+                    <div style={{ fontSize: '13px', marginTop: '4px' }}>Try adjusting the selected branch or period.</div>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -772,6 +830,13 @@ const SmartModal = ({ type, branchCode, period, onClose }) => {
                       highlightOnHover
                       striped
                       dense
+                      customStyles={customTableStyles}
+                      noDataComponent={
+                        <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#94A3B8', gap: '12px' }}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                          <span style={{ fontSize: '13px', fontWeight: '500' }}>No matching records found in detailed view</span>
+                        </div>
+                      }
                     />
                   </div>
                 </>

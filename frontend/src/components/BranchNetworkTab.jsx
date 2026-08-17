@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Building2, Store, Search, ShieldCheck, MapPin } from 'lucide-react';
+import { ChevronDown, ChevronRight, Building2, Store, Search, MapPin, Building } from 'lucide-react';
 
 const BranchNetworkTab = () => {
   const [data, setData] = useState([]);
@@ -35,7 +35,6 @@ const BranchNetworkTab = () => {
     branch.REGIONAL_OFFICE.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Group by Regional Office
   const groupedData = filteredData.reduce((acc, branch) => {
     if (!acc[branch.REGIONAL_OFFICE]) acc[branch.REGIONAL_OFFICE] = [];
     acc[branch.REGIONAL_OFFICE].push(branch);
@@ -44,7 +43,6 @@ const BranchNetworkTab = () => {
 
   const headOfficeBranches = groupedData['Head Office'] || [];
 
-  // Sort regions: Head Office first, then Rail Head Complex, then alphabetical
   const sortedRegions = Object.keys(groupedData).sort((a, b) => {
     if (a === 'Head Office') return -1;
     if (b === 'Head Office') return 1;
@@ -112,216 +110,117 @@ const BranchNetworkTab = () => {
       {/* Corporate Tree Container */}
       <div style={{ 
         background: '#ffffff', 
-        borderRadius: '16px', 
+        borderRadius: '12px', 
         border: '1px solid #E5E7EB', 
-        overflow: 'hidden', 
-        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02)' 
+        padding: '24px',
+        boxShadow: 'var(--shadow-premium)' 
       }}>
         
-        {/* Head Office Node */}
+        {/* ROOT: Bank Node */}
         <div 
           onClick={() => setHeadOfficeExpanded(!headOfficeExpanded)}
           style={{ 
-            padding: '20px 24px', 
-            background: 'linear-gradient(90deg, #1E3A8A 0%, #1E40AF 100%)', 
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            borderBottom: headOfficeExpanded ? '1px solid #E5E7EB' : 'none',
-            color: 'white'
+            gap: '12px',
+            color: '#1E3A8A',
+            userSelect: 'none'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
-              <Building2 size={24} color="#ffffff" />
-            </div>
-            <div>
-              <div style={{ fontSize: '18px', fontWeight: '700' }}>Jammu Central Co-op Bank Ltd.</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '600' }}>
-              {data.length} Total Branches
-            </div>
-            {headOfficeExpanded ? <ChevronDown size={24} opacity={0.8} /> : <ChevronRight size={24} opacity={0.8} />}
-          </div>
+          {headOfficeExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+          <Building2 size={24} />
+          <span style={{ fontSize: '18px', fontWeight: '700' }}>Jammu Central Co-op Bank Ltd.</span>
+          <span style={{ fontSize: '12px', background: '#DBEAFE', color: '#1E40AF', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+            {data.length} Total Branches
+          </span>
         </div>
 
         {headOfficeExpanded && (
-          <div style={{ padding: '20px', background: '#F8FAFC' }}>
+          <div style={{ marginLeft: '10px', paddingLeft: '24px', borderLeft: '2px solid #E2E8F0', marginTop: '8px' }}>
             
-            {/* Head Office Node (Level 2) */}
-            <div style={{ 
-              background: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-              overflow: 'hidden'
-            }}>
-              <div 
-                onClick={() => toggleRegion('Head Office')}
-                style={{ 
-                  padding: '20px 24px', 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  background: '#F1F5F9',
-                  borderBottom: expandedRegions['Head Office'] ? '1px solid #E2E8F0' : 'none',
-                  transition: 'background 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#E2E8F0'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#F1F5F9'}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  {expandedRegions['Head Office'] ? <ChevronDown size={24} color="#334155" /> : <ChevronRight size={24} color="#334155" />}
-                  <Building2 size={24} color="#3B82F6" />
-                  <div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A', letterSpacing: '-0.01em' }}>
-                      Head Office
-                    </div>
-                  </div>
-                </div>
-                <div style={{ fontSize: '14px', color: '#64748B', fontWeight: '600' }}>
-                  {headOfficeBranches.length} Direct Branch • {sortedRegions.filter(r => r !== 'Head Office').length} Regions
-                </div>
-              </div>
+            {/* LEVEL 1: Regions */}
+            {sortedRegions.map((region, index) => {
+              const branches = groupedData[region];
+              const isExpanded = expandedRegions[region];
+              const isHeadOffice = region === 'Head Office';
 
-              {/* Inside Head Office */}
-              {expandedRegions['Head Office'] && (
-                <div style={{ padding: '24px', background: '#ffffff' }}>
+              return (
+                <div key={region} style={{ marginTop: '16px' }} className="animate-slide-up" style={{ animationDelay: `${index * 0.05}s`, marginTop: '16px' }}>
                   
-                  {/* Direct Head Office Branches */}
-                  {headOfficeBranches.length > 0 && (
-                    <div style={{ marginBottom: '32px' }}>
-                      <div style={{ fontSize: '13px', color: '#64748B', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                        Head Office Branches
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
-                        {headOfficeBranches.map(branch => (
-                          <div key={branch.ID} style={{
-                            background: '#EFF6FF',
-                            border: '1px solid #BFDBFE',
-                            padding: '14px 16px',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            color: '#1E40AF',
-                            fontWeight: '700',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                          }}>
-                            <Building2 size={18} />
-                            {branch.BRANCH_NAME}
+                  {/* Region Node */}
+                  <div 
+                    onClick={() => toggleRegion(region)}
+                    style={{ 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      color: isHeadOffice ? '#10B981' : '#F97316',
+                      userSelect: 'none',
+                      padding: '8px 0',
+                      borderRadius: '6px',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                    {isHeadOffice ? <Building size={20} /> : <MapPin size={20} />}
+                    <span style={{ fontSize: '15px', fontWeight: '600', color: '#1E293B' }}>{region}</span>
+                    <span style={{ fontSize: '12px', background: '#F1F5F9', color: '#64748B', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+                      {branches.length} Branch{branches.length !== 1 ? 'es' : ''}
+                    </span>
+                  </div>
+
+                  {/* LEVEL 2: Branches */}
+                  {isExpanded && (
+                    <div style={{ marginLeft: '10px', paddingLeft: '24px', borderLeft: '2px dashed #CBD5E1', marginTop: '4px', paddingBottom: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', paddingTop: '8px' }}>
+                        {branches.map(branch => (
+                          <div 
+                            key={branch.ID} 
+                            style={{ 
+                              background: '#ffffff',
+                              border: '1px solid #E2E8F0',
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              transition: 'all 0.2s',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                              position: 'relative'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = '#94A3B8';
+                              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = '#E2E8F0';
+                              e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.02)';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            <Store size={16} color="#94A3B8" />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '13px', fontWeight: '600', color: '#0F172A' }}>
+                                {branch.BRANCH_NAME}
+                              </span>
+                              <span style={{ fontSize: '10px', color: '#64748B' }}>
+                                Code: {branch.BRANCH_CODE || 'N/A'}
+                              </span>
+                            </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Regional Offices */}
-                  <div>
-                    <div style={{ fontSize: '13px', color: '#64748B', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                      Regional Offices
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {sortedRegions.filter(r => r !== 'Head Office').map((region) => {
-                        const branches = groupedData[region];
-                        const isExpanded = expandedRegions[region];
-                        
-                        return (
-                          <div key={region} style={{ 
-                            background: '#ffffff',
-                            borderRadius: '12px',
-                            border: isExpanded ? '1px solid #FDBA74' : '1px solid #E2E8F0',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                            overflow: 'hidden'
-                          }}>
-                            {/* Region Header */}
-                            <div 
-                              onClick={() => toggleRegion(region)}
-                              style={{ 
-                                padding: '16px 20px', 
-                                cursor: 'pointer', 
-                                display: 'flex', 
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                background: isExpanded ? '#FFF7ED' : '#F8FAFC',
-                                borderBottom: isExpanded ? '1px solid #FDBA74' : 'none',
-                                transition: 'background 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = isExpanded ? '#FFEDD5' : '#F1F5F9'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = isExpanded ? '#FFF7ED' : '#F8FAFC'}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                {isExpanded ? <ChevronDown size={20} color="#EA580C" /> : <ChevronRight size={20} color="#64748B" />}
-                                <MapPin size={20} color={isExpanded ? "#F97316" : "#94A3B8"} />
-                                <div>
-                                  <div style={{ fontSize: '12px', color: isExpanded ? '#EA580C' : '#64748B', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                    Regional Office
-                                  </div>
-                                  <div style={{ fontSize: '16px', fontWeight: '700', color: isExpanded ? '#9A3412' : '#1E293B', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    {region}
-                                  </div>
-                                </div>
-                              </div>
-                              <div style={{ fontSize: '13px', color: isExpanded ? '#EA580C' : '#64748B', fontWeight: '600' }}>
-                                {branches.length} Branch{branches.length !== 1 ? 'es' : ''}
-                              </div>
-                            </div>
-
-                            {/* Branches Level - Grid Layout */}
-                            {isExpanded && (
-                              <div style={{ 
-                                padding: '20px', 
-                                background: '#FFFAF0',
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                                gap: '12px'
-                              }}>
-                                {branches.map((branch) => (
-                                  <div 
-                                    key={branch.ID} 
-                                    style={{ 
-                                      background: '#F8FAFC',
-                                      border: '1px solid #E2E8F0',
-                                      padding: '12px 16px',
-                                      borderRadius: '8px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px',
-                                      transition: 'all 0.2s',
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.borderColor = '#94A3B8';
-                                      e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)';
-                                      e.currentTarget.style.background = '#ffffff';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.borderColor = '#E2E8F0';
-                                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)';
-                                      e.currentTarget.style.background = '#F8FAFC';
-                                    }}
-                                  >
-                                    <Store size={16} color="#94A3B8" />
-                                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1E293B' }}>
-                                      {branch.BRANCH_NAME}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
                 </div>
-              )}
-            </div>
+              );
+            })}
 
             {sortedRegions.length === 0 && (
               <div style={{ padding: '48px', textAlign: 'center' }}>

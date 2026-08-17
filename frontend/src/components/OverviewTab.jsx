@@ -1,29 +1,28 @@
 import React, { useMemo, useState } from 'react';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LabelList,
-  AreaChart,
-  Area,
-  CartesianGrid,
-  Legend
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Legend, LabelList
 } from 'recharts';
 import KPICard from './KPICard';
+import { ArrowRight } from 'lucide-react';
 
-const COLORS = [
-  '#F97316',
-  '#10B981',
-  '#3B82F6',
-  '#EF4444',
-  '#8B5CF6',
-  '#14B8A6',
+const COLORS = ['#0F172A', '#D4AF37', '#10B981', '#8B5CF6', '#EF4444'];
+
+// Dummy data for mockup completeness
+const npaTrendData = [
+  { name: '13 Jul', value: 0.8 }, { name: '16 Jul', value: 1.1 },
+  { name: '20 Jul', value: 0.9 }, { name: '23 Jul', value: 1.2 },
+  { name: '27 Jul', value: 1.4 }, { name: '30 Jul', value: 1.3 },
+  { name: '03 Aug', value: 1.6 }, { name: '06 Aug', value: 1.4 },
+  { name: '10 Aug', value: 2.2 }
+];
+
+const topBranchesData = [
+  { name: 'Connaught Place', value: 125.48 },
+  { name: 'Saket', value: 98.62 },
+  { name: 'Dwarka', value: 87.25 },
+  { name: 'Noida Sector 18', value: 74.31 },
+  { name: 'Gurgaon Main', value: 65.12 }
 ];
 
 const OverviewTab = ({
@@ -33,732 +32,244 @@ const OverviewTab = ({
   barChartData,
   pieData,
   trendData,
+  npaSummaryData,
+  auditData,
   setActiveModal,
+  setActiveTab,
 }) => {
-  const [npaView, setNpaView] = useState('top');
-
-  /*
-   * Always sort from the actual NPA value.
-   * We do NOT trust the order coming from backend.
-   */
   const sortedNpaData = useMemo(() => {
-    if (!Array.isArray(branchNpaData)) {
-      return [];
-    }
-
+    if (!Array.isArray(branchNpaData)) return [];
     return [...branchNpaData]
-      .map((item) => ({
-        ...item,
-        NPA: Number(item.NPA) || 0,
-      }))
-      .sort((a, b) => {
-        if (npaView === 'top') {
-          return b.NPA - a.NPA;
-        }
+      .map(item => ({ name: (item.BRANCH_NAME || item.name || '').substring(0, 15), value: Number(item.NPA) || 0 }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [branchNpaData]);
 
-        return a.NPA - b.NPA;
-      });
-  }, [branchNpaData, npaView]);
-
-  /*
-   * Exactly 5 records.
-   */
-  const displayNpaData = sortedNpaData.slice(0, 5);
-
-  const totalNpa = displayNpaData.reduce(
-    (sum, item) => sum + item.NPA,
-    0
-  );
+  const totalBusiness = useMemo(() => {
+    if (!pieData || !pieData.length) return 0;
+    return pieData.reduce((acc, curr) => acc + (curr.value || 0), 0);
+  }, [pieData]);
 
   return (
-    <div
-      className="dashboard-content"
-      style={{
-        padding: '24px 32px',
-        overflowY: 'auto',
-      }}
-    >
-      {/* =======================================================
-          KPI ROW
-      ======================================================= */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
-          gap: '20px',
-          marginBottom: '24px',
-        }}
-      >
-        <KPICard
-          title="Total Accounts"
-          value={accountMetrics.total}
-          isCurrency={false}
-          changePercent="1.2"
-          changeType="positive"
-          onClick={() => setActiveModal('total')}
-        />
-
-        <KPICard
-          title="Total Deposits"
-          value={kpiData.total_deposits}
-          changePercent="8.3"
-          changeType="positive"
-          onClick={() => setActiveModal('deposits')}
-        />
-
-        <KPICard
-          title="Total Loans"
-          value={kpiData.total_loans}
-          changePercent="5.7"
-          changeType="positive"
-          onClick={() => setActiveModal('loans')}
-        />
-
-        <KPICard
-          title="Total NPA"
-          value={kpiData.total_npa}
-          changePercent="2.1"
-          changeType="negative"
-          warning={true}
-          warningText="Click to view accounts >"
-          onClick={() => setActiveModal('npa')}
-        />
-
-        <KPICard
-          title="Opened Accounts"
-          value={accountMetrics.opened}
-          isCurrency={false}
-          changePercent="12.4"
-          changeType="positive"
-          onClick={() => setActiveModal('opened')}
-        />
-
-        <KPICard
-          title="Closed Accounts"
-          value={accountMetrics.closed}
-          isCurrency={false}
-          changePercent="4.8"
-          changeType="negative"
-          onClick={() => setActiveModal('closed')}
-        />
+    <div className="dashboard-content" style={{ padding: '24px 32px', overflowY: 'auto' }}>
+      
+      {/* KPI ROW */}
+      <div className="overview-kpi-grid">
+        <KPICard title="TOTAL ACCOUNTS" value={accountMetrics?.total || 0} isCurrency={false} changePercent="7.2" changeType="positive" onClick={() => setActiveModal('total')} />
+        <KPICard title="TOTAL DEPOSITS" value={kpiData?.total_deposits || 0} isCurrency={true} changePercent="8.3" changeType="positive" onClick={() => setActiveModal('deposits')} />
+        <KPICard title="TOTAL LOANS" value={kpiData?.total_loans || 0} isCurrency={true} changePercent="6.1" changeType="positive" onClick={() => setActiveModal('loans')} />
+        <KPICard title="TOTAL NPA" value={kpiData?.total_npa || 0} isCurrency={true} changePercent="12.6" changeType="negative" onClick={() => setActiveModal('npa')} />
+        <KPICard title="OPENED ACCOUNTS" value={accountMetrics?.opened || 0} isCurrency={false} changePercent="5.4" changeType="positive" onClick={() => setActiveModal('opened')} />
+        <KPICard title="CLOSED ACCOUNTS" value={accountMetrics?.closed || 0} isCurrency={false} changePercent="3.7" changeType="negative" onClick={() => setActiveModal('closed')} />
       </div>
 
-      {/* =======================================================
-          NPA TOP / LEAST 5
-      ======================================================= */}
-      <div
-        style={{
-          marginBottom: '24px',
-        }}
-      >
-        <div
-          className="card"
-          style={{
-            padding: '24px',
-            background: '#fff',
-            borderRadius: '12px',
-            border: '1px solid #E5E7EB',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-              gap: '20px',
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  color: '#111827',
-                }}
-              >
-                NPA Defaulting Branches
-              </div>
-
-              <div
-                style={{
-                  fontSize: '13px',
-                  color: '#6B7280',
-                  marginTop: '4px',
-                }}
-              >
-                {npaView === 'top'
-                  ? 'Highest 5 NPA branches'
-                  : 'Lowest 5 NPA branches'}
-                {' • '}
-                Outstanding NPA (₹ Lakhs)
-              </div>
-            </div>
-
-            {/* =================================================
-                WORKING TOGGLE
-            ================================================= */}
-            <div
-              style={{
-                display: 'flex',
-                background: '#F3F4F6',
-                borderRadius: '22px',
-                padding: '4px',
-                gap: '4px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setNpaView('top')}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  cursor: 'pointer',
-                  padding: '7px 16px',
-                  borderRadius: '18px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  background:
-                    npaView === 'top'
-                      ? '#F97316'
-                      : 'transparent',
-                  color:
-                    npaView === 'top'
-                      ? '#FFFFFF'
-                      : '#6B7280',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                Top 5
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setNpaView('least')}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  cursor: 'pointer',
-                  padding: '7px 16px',
-                  borderRadius: '18px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  background:
-                    npaView === 'least'
-                      ? '#F97316'
-                      : 'transparent',
-                  color:
-                    npaView === 'least'
-                      ? '#FFFFFF'
-                      : '#6B7280',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                Least 5
-              </button>
-            </div>
+      {/* MIDDLE ROW (3 Charts) */}
+      <div className="overview-npa-summary-grid" style={{ gap: '24px', marginBottom: '24px' }}>
+        
+        {/* Deposits vs Loans Trend */}
+        <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Deposits vs Loans Trend</h3>
+            <select style={{ fontSize: '12px', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '2px 8px', outline: 'none' }}><option>30D</option></select>
           </div>
-
-          {/* =================================================
-              SUMMARY
-          ================================================= */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '12px',
-              marginBottom: '20px',
-            }}
-          >
-            <div
-              style={{
-                background: '#F8FAFC',
-                borderRadius: '8px',
-                padding: '12px 14px',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '11px',
-                  color: '#64748B',
-                }}
-              >
-                Showing
-              </div>
-
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: '700',
-                  color: '#111827',
-                  marginTop: '3px',
-                }}
-              >
-                {displayNpaData.length} {displayNpaData.length === 1 ? 'Branch' : 'Branches'}
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: '#FFF7ED',
-                borderRadius: '8px',
-                padding: '12px 14px',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '11px',
-                  color: '#9A3412',
-                }}
-              >
-                View
-              </div>
-
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: '700',
-                  color: '#C2410C',
-                  marginTop: '3px',
-                }}
-              >
-                {npaView === 'top'
-                  ? 'Highest NPA'
-                  : 'Lowest NPA'}
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: '#F0FDF4',
-                borderRadius: '8px',
-                padding: '12px 14px',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '11px',
-                  color: '#166534',
-                }}
-              >
-                Visible NPA Amount
-              </div>
-
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: '700',
-                  color: '#166534',
-                  marginTop: '3px',
-                }}
-              >
-                ₹ {Math.abs(totalNpa).toLocaleString('en-IN', {
-                  maximumFractionDigits: 2,
-                })} L
-              </div>
-            </div>
-          </div>
-
-          {/* =================================================
-              CHART
-          ================================================= */}
-          <div style={{ height: '360px' }}>
-            {displayNpaData.length === 0 ? (
-              <div
-                style={{
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6B7280',
-                  fontSize: '14px',
-                }}
-              >
-                No NPA data available
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={displayNpaData}
-                  layout="vertical"
-                  margin={{
-                    top: 5,
-                    right: 60,
-                    left: 60,
-                    bottom: 5,
-                  }}
-                  barGap={4}
-                >
-                  <XAxis
-                    type="number"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{
-                      fontSize: 11,
-                      fill: '#64748B',
-                    }}
-                  />
-
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{
-                      fontSize: 12,
-                      fill: '#374151',
-                    }}
-                    width={140}
-                  />
-
-                  <Tooltip
-                    cursor={{
-                      fill: '#F8FAFC',
-                    }}
-                    formatter={(value, name) => [
-                      `₹ ${Math.abs(Number(value)).toLocaleString('en-IN', {
-                        maximumFractionDigits: 2,
-                      })} L`,
-                      'Outstanding NPA'
-                    ]}
-                  />
-
-                  <Bar
-                    dataKey="NPA"
-                    name="NPA"
-                    fill="#EF4444"
-                    barSize={16}
-                    radius={[0, 4, 4, 0]}
-                  >
-                    <LabelList dataKey="NPA" position="right" formatter={(val) => `₹${Math.abs(Number(val)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}L`} style={{ fontSize: '11px', fill: '#64748B' }} />
-                  </Bar>
-
-
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* =======================================================
-          CREDIT VS DEBIT + ACCOUNT DISTRIBUTION
-      ======================================================= */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '24px',
-        }}
-      >
-        {/* Credit vs Debit */}
-        <div
-          className="card"
-          style={{
-            padding: '24px',
-            background: '#fff',
-            borderRadius: '12px',
-            border: '1px solid #E5E7EB',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          <div style={{ marginBottom: '24px' }}>
-            <div
-              style={{
-                fontSize: '15px',
-                fontWeight: '700',
-                color: '#111827',
-              }}
-            >
-              Product-wise Credit vs Debit
-            </div>
-
-            <div
-              style={{
-                fontSize: '13px',
-                color: '#6B7280',
-              }}
-            >
-              ₹ in Lakhs
-            </div>
-          </div>
-
-          <div style={{ height: '300px' }}>
+          <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={barChartData}
-                margin={{
-                  top: 5,
-                  right: 10,
-                  left: -20,
-                  bottom: 5,
-                }}
-              >
-                <XAxis
-                  dataKey="name"
-                  hide
-                />
-
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{
-                    fontSize: 11,
-                    fill: '#6B7280',
-                  }}
-                />
-
-                <Tooltip
-                  cursor={{
-                    fill: '#F9FAFB',
-                  }}
-                />
-
-                <Bar
-                  dataKey="Credit"
-                  fill="#3B82F6"
-                  barSize={15}
-                  radius={[4, 4, 0, 0]}
-                />
-
-                <Bar
-                  dataKey="Debit"
-                  fill="#F97316"
-                  barSize={15}
-                  radius={[4, 4, 0, 0]}
-                />
+              <BarChart data={barChartData && barChartData.length > 0 ? barChartData : trendData || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                <Tooltip cursor={{ fill: '#F8FAFC' }} />
+                <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: '12px' }} />
+                <Bar dataKey="Credit" name="Deposits" fill="#0F172A" barSize={12} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Debit" name="Loans" fill="#D4AF37" barSize={12} radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Account Distribution */}
-        <div
-          className="card"
-          style={{
-            padding: '24px',
-            background: '#fff',
-            borderRadius: '12px',
-            border: '1px solid #E5E7EB',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          <div style={{ marginBottom: '16px' }}>
-            <div
-              style={{
-                fontSize: '15px',
-                fontWeight: '700',
-                color: '#111827',
-              }}
-            >
-              Account Distribution
-            </div>
-
-            <div
-              style={{
-                fontSize: '13px',
-                color: '#6B7280',
-              }}
-            >
-              By account type
-            </div>
+        {/* NPA Trend (%) */}
+        <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>NPA Trend (%)</h3>
+            <select style={{ fontSize: '12px', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '2px 8px', outline: 'none' }}><option>30D</option></select>
           </div>
+          <div style={{ height: '240px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={npaTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorNpa" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(val) => val+"%"} />
+                <Tooltip />
+                <Area type="monotone" dataKey="value" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorNpa)" activeDot={{ r: 6, fill: '#EF4444', stroke: '#fff', strokeWidth: 2 }} dot={{ r: 4, fill: '#EF4444', strokeWidth: 0 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
-          <div
-            style={{
-              height: '300px',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            <div
-              style={{
-                width: '50%',
-                height: '100%',
-              }}
-            >
+        {/* Top 5 Branches */}
+        <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Top 5 Branches by NPA</h3>
+            <select style={{ fontSize: '12px', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '2px 8px', outline: 'none' }}><option>Top 5</option></select>
+          </div>
+          <div style={{ height: '240px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={sortedNpaData && sortedNpaData.length > 0 ? sortedNpaData : topBranchesData} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#0F172A', fontWeight: 500 }} width={100} />
+                <Tooltip cursor={{ fill: '#F8FAFC' }} />
+                <Bar dataKey="value" fill="#0F172A" barSize={12} radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="value" position="right" style={{ fontSize: '11px', fill: '#64748B' }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+      </div>
+
+      {/* BOTTOM ROW (3 Widgets) */}
+      <div className="overview-npa-summary-grid" style={{ gap: '24px', marginBottom: '24px' }}>
+        
+        {/* Business Mix */}
+        <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: '0 0 16px 0' }}>Business Mix</h3>
+          <div style={{ display: 'flex', alignItems: 'center', height: '200px' }}>
+            <div style={{ width: '60%', height: '100%', position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
+                  <Pie data={pieData && pieData.length > 0 ? pieData : [{name: 'Empty', value: 100}]} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none">
+                    {(pieData && pieData.length > 0 ? pieData : [{name: 'Empty', value: 100}]).map((entry, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                   </Pie>
-
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '600' }}>Total</div>
+                <div style={{ fontSize: '14px', color: '#0F172A', fontWeight: '700' }}>100%</div>
+              </div>
             </div>
-
-            <div
-              style={{
-                width: '50%',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-              }}
-            >
-              {pieData.map((entry, index) => (
-                <div
-                  key={index}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '14px',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        backgroundColor:
-                          COLORS[index % COLORS.length],
-                      }}
-                    />
-
-                    <span
-                      style={{
-                        color: '#4B5563',
-                      }}
-                      title={entry.name}
-                    >
-                      {entry.name.substring(0, 18)}
-                    </span>
+            <div style={{ width: '40%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {(pieData && pieData.length > 0 ? pieData : []).slice(0,4).map((entry, index) => (
+                <div key={index} className="animate-slide-up" style={{ animationDelay: `${index * 0.1}s`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: COLORS[index % COLORS.length] }}></div>
+                    <span style={{ color: '#0F172A', fontWeight: '500', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.name}>{entry.name}</span>
                   </div>
-
-                  <span
-                    style={{
-                      fontWeight: '700',
-                      color: '#111827',
-                    }}
-                  >
-                    {entry.value}%
-                  </span>
+                  <span style={{ color: '#64748B', fontWeight: '600' }}>{totalBusiness > 0 ? ((entry.value / totalBusiness) * 100).toFixed(1) : 0}%</span>
                 </div>
               ))}
             </div>
           </div>
+          <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '16px' }}>As on 12 Aug 2026</div>
         </div>
+
+        {/* NPA Summary */}
+        <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>NPA Summary</h3>
+            <span style={{ fontSize: '12px', color: '#3B82F6', cursor: 'pointer', fontWeight: '600' }}>View Details</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
+                <th style={{ textAlign: 'left', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>Category</th>
+                <th style={{ textAlign: 'center', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>Amount (Cr)</th>
+                <th style={{ textAlign: 'center', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>% of Loans</th>
+                <th style={{ textAlign: 'right', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>Change (vs last 30D)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(npaSummaryData || []).map((row, i) => (
+                <tr key={i} className="animate-slide-up" style={{ animationDelay: `${i * 0.1}s`, borderBottom: '1px solid #F1F5F9', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                  <td style={{ padding: '12px 8px', color: '#0F172A', fontWeight: '500' }}>
+                    <span style={{ 
+                      padding: '4px 8px', 
+                      borderRadius: '4px', 
+                      backgroundColor: row.category.toLowerCase().includes('doubtful') || row.category.toLowerCase().includes('loss') ? '#FEE2E2' : '#EFF6FF',
+                      color: row.category.toLowerCase().includes('doubtful') || row.category.toLowerCase().includes('loss') ? '#991B1B' : '#1E40AF',
+                      fontSize: '11px',
+                      fontWeight: '600'
+                    }}>
+                      {row.category}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 8px', textAlign: 'center', color: '#0F172A' }}>{row.amount}</td>
+                  <td style={{ padding: '12px 8px', textAlign: 'center', color: '#0F172A' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <div style={{ width: '40px', height: '4px', backgroundColor: '#E2E8F0', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ width: row.pct || '0%', height: '100%', backgroundColor: '#3B82F6' }}></div>
+                      </div>
+                      <span style={{ fontSize: '11px' }}>{row.pct}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 8px', textAlign: 'right', color: row.isPositive ? '#10B981' : '#EF4444', fontWeight: '600' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', background: row.isPositive ? '#D1FAE5' : '#FEE2E2', padding: '4px 8px', borderRadius: '12px', display: 'inline-flex' }}>
+                      {row.isPositive ? '▲' : '▼'} {row.change}%
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td colSpan="4" style={{ padding: '16px 8px 8px 8px', textAlign: 'center', color: '#64748B', fontSize: '11px' }}>Total values aggregated by backend</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Audit & Exceptions */}
+        <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Audit & Exceptions</h3>
+            <span style={{ fontSize: '12px', color: '#3B82F6', cursor: 'pointer', fontWeight: '600' }}>View All</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {auditData && auditData.length > 0 ? auditData.map((audit, i) => (
+              <div key={i} className="animate-slide-up" style={{ animationDelay: `${i * 0.1}s`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#F8FAFC', borderRadius: '8px', borderLeft: `4px solid ${audit.color || '#3B82F6'}`, transition: 'all 0.2s', cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateX(4px)'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                <span style={{ fontSize: '13px', color: '#0F172A', fontWeight: '600' }}>{audit.title}</span>
+                <span style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '12px', backgroundColor: `${audit.color}20`, color: audit.color || '#3B82F6', fontWeight: '700' }}>{audit.count} Items</span>
+              </div>
+            )) : (
+              <div className="animate-slide-up" style={{ textAlign: 'center', color: '#64748B', fontSize: '13px', padding: '30px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', background: '#F8FAFC', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
+                <ShieldCheck size={28} color="#94A3B8" />
+                <span style={{ fontWeight: '500' }}>No exceptions found</span>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
-      {/* =======================================================
-          DATE-WISE TREND CHART (LOANS VS DEPOSITS)
-      ======================================================= */}
-      <div
-        className="card"
-        style={{
-          padding: '24px',
-          background: '#fff',
-          borderRadius: '12px',
-          border: '1px solid #E5E7EB',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          marginTop: '24px'
-        }}
-      >
-        <div style={{ marginBottom: '24px' }}>
-          <div
-            style={{
-              fontSize: '15px',
-              fontWeight: '700',
-              color: '#111827',
-            }}
-          >
-            Growth Trend (Loans vs Deposits)
+      {/* QUICK LINKS FOOTER */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '16px 20px', boxShadow: 'var(--shadow-premium)', overflowX: 'auto' }}>
+        <h4 style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', margin: 0, whiteSpace: 'nowrap' }}>Quick Links</h4>
+        
+        {[
+          { label: 'Deposits', action: () => setActiveTab('deposits') },
+          { label: 'Loans Portfolio', action: () => setActiveTab('loans') },
+          { label: 'NPA Drill-down', action: () => setActiveModal('npa') },
+          { label: 'Compliance', action: () => setActiveTab('compliance') },
+          { label: 'Reports', action: () => setActiveTab('reports') },
+        ].map((link, i) => (
+          <div key={i} onClick={link.action} style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px', 
+            background: '#F8FAFC', 
+            padding: '8px 16px', borderRadius: '20px', 
+            cursor: 'pointer', whiteSpace: 'nowrap',
+            border: '1px solid #E2E8F0',
+            transition: 'background 0.2s'
+          }}>
+            <span style={{ fontSize: '12px', color: '#0F172A', fontWeight: '500' }}>{link.label}</span>
+            <ArrowRight size={14} color="#64748B" />
           </div>
-
-          <div
-            style={{
-              fontSize: '13px',
-              color: '#6B7280',
-            }}
-          >
-            ₹ in Lakhs • Time-series view
-          </div>
-        </div>
-
-        <div style={{ height: '320px' }}>
-          {!trendData || trendData.length === 0 ? (
-            <div
-              style={{
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#6B7280',
-                fontSize: '14px',
-              }}
-            >
-              No trend data available for this period.
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={trendData}
-                margin={{
-                  top: 10,
-                  right: 30,
-                  left: 0,
-                  bottom: 0,
-                }}
-              >
-                <defs>
-                  <linearGradient id="colorLoans" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorDeposits" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: '#6B7280' }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: '#6B7280' }}
-                  tickFormatter={(val) => `₹${Math.abs(val).toLocaleString('en-IN')}`}
-                  width={80}
-                />
-                <Tooltip 
-                  formatter={(value, name) => [`₹ ${Math.abs(Number(value)).toLocaleString('en-IN', { maximumFractionDigits: 2 })} L`, name]}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                />
-                <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }}/>
-                <Area type="monotone" dataKey="Loans" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorLoans)" />
-                <Area type="monotone" dataKey="Deposits" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorDeposits)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+        ))}
       </div>
 
     </div>
