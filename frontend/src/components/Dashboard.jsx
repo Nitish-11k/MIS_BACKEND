@@ -9,6 +9,7 @@ import DepositsTab from './DepositsTab';
 import ComplianceTab from './ComplianceTab';
 import ReportsTab from './ReportsTab';
 import UploadTab from './UploadTab';
+import BranchNetworkTab from './BranchNetworkTab';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -64,7 +65,7 @@ const Dashboard = () => {
         total: accMetrics.total || 0
       });
       
-      setBranchNpaData(npaData && npaData.length > 0 ? npaData.map(d => ({ ...d, NPA: (d.NPA||0)/100000, Covered: (d.Covered||0)/100000 })) : []);
+      setBranchNpaData(npaData && npaData.length > 0 ? npaData.map(d => ({ ...d, NPA: (d.NPA||0)/100000 })) : []);
       
       setBarChartData(Array.isArray(prodData) && prodData.length > 0 ? prodData.slice(0,7).map(d => ({ name: d.name.substring(0, 10), Credit: (d.credit||0)/100000, Debit: (d.debit||0)/100000 })) : []);
       
@@ -170,7 +171,7 @@ const Dashboard = () => {
             />
           )}
           
-          {activeTab === 'network' && <PlaceholderTab title="Branch Network" description="Analyze performance and operations across different branch locations." />}
+          {activeTab === 'network' && <BranchNetworkTab />}
           {activeTab === 'loans' && <LoanPortfolioTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
           {activeTab === 'deposits' && <DepositsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}
           {activeTab === 'compliance' && <ComplianceTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} exactDate={exactDate} />}

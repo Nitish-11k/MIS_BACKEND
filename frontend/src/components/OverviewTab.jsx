@@ -50,7 +50,6 @@ const OverviewTab = ({
       .map((item) => ({
         ...item,
         NPA: Number(item.NPA) || 0,
-        Covered: Number(item.Covered) || 0,
       }))
       .sort((a, b) => {
         if (npaView === 'top') {
@@ -194,7 +193,7 @@ const OverviewTab = ({
                   ? 'Highest 5 NPA branches'
                   : 'Lowest 5 NPA branches'}
                 {' • '}
-                Outstanding vs Covered (₹ Lakhs)
+                Outstanding NPA (₹ Lakhs)
               </div>
             </div>
 
@@ -355,7 +354,7 @@ const OverviewTab = ({
                   marginTop: '3px',
                 }}
               >
-                ₹ {totalNpa.toLocaleString('en-IN', {
+                ₹ {Math.abs(totalNpa).toLocaleString('en-IN', {
                   maximumFractionDigits: 2,
                 })} L
               </div>
@@ -419,12 +418,10 @@ const OverviewTab = ({
                       fill: '#F8FAFC',
                     }}
                     formatter={(value, name) => [
-                      `₹ ${Number(value).toLocaleString('en-IN', {
+                      `₹ ${Math.abs(Number(value)).toLocaleString('en-IN', {
                         maximumFractionDigits: 2,
                       })} L`,
-                      name === 'NPA'
-                        ? 'Outstanding NPA'
-                        : 'Covered',
+                      'Outstanding NPA'
                     ]}
                   />
 
@@ -435,18 +432,10 @@ const OverviewTab = ({
                     barSize={16}
                     radius={[0, 4, 4, 0]}
                   >
-                    <LabelList dataKey="NPA" position="right" formatter={(val) => `₹${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 })}L`} style={{ fontSize: '11px', fill: '#64748B' }} />
+                    <LabelList dataKey="NPA" position="right" formatter={(val) => `₹${Math.abs(Number(val)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}L`} style={{ fontSize: '11px', fill: '#64748B' }} />
                   </Bar>
 
-                  <Bar
-                    dataKey="Covered"
-                    name="Covered"
-                    fill="#10B981"
-                    barSize={16}
-                    radius={[0, 4, 4, 0]}
-                  >
-                    <LabelList dataKey="Covered" position="right" formatter={(val) => `₹${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 })}L`} style={{ fontSize: '11px', fill: '#64748B' }} />
-                  </Bar>
+
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -756,11 +745,11 @@ const OverviewTab = ({
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 11, fill: '#6B7280' }}
-                  tickFormatter={(val) => `₹${(val).toLocaleString('en-IN')}`}
+                  tickFormatter={(val) => `₹${Math.abs(val).toLocaleString('en-IN')}`}
                   width={80}
                 />
                 <Tooltip 
-                  formatter={(value, name) => [`₹ ${Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 })} L`, name]}
+                  formatter={(value, name) => [`₹ ${Math.abs(Number(value)).toLocaleString('en-IN', { maximumFractionDigits: 2 })} L`, name]}
                   contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                 />
                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }}/>
