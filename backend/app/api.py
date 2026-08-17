@@ -498,7 +498,7 @@ def get_opened_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_
     if branch_code != "ALL":
         where_sql += " AND BRANCH_CODE = ?" if "WHERE" in where_sql else " WHERE BRANCH_CODE = ?"
         params.append(branch_code)
-        
+    
     try:
         cursor.execute(f"""
             SELECT BRANCH_NAME, COUNT(*) as cnt,
