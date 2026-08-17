@@ -1,0 +1,639 @@
+[
+    {
+        "BRANCH_NAME": "PARADE",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Near Women College Parade",
+        "BRANCH_CODE": "00061"
+    },
+    {
+        "BRANCH_NAME": "SARWAL JAMMU BR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Chowk Sarwal",
+        "BRANCH_CODE": "00078"
+    },
+    {
+        "BRANCH_NAME": "RAIL HEAD COMPLEX",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Shekari Bhawan Rail Head Complex",
+        "BRANCH_CODE": "00002"
+    },
+    {
+        "BRANCH_NAME": "GANDHI NAGAR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Gole Market",
+        "BRANCH_CODE": "00030"
+    },
+    {
+        "BRANCH_NAME": "SHASTRI NAGAR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Chowk Shastri Nagar",
+        "BRANCH_CODE": "00080"
+    },
+    {
+        "BRANCH_NAME": "SHAKTI NAGAR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Shakti Nagar",
+        "BRANCH_CODE": "00079"
+    },
+    {
+        "BRANCH_NAME": "DIGIANA BRANCH,JAMMU",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Chowk Digiana",
+        "BRANCH_CODE": "00023"
+    },
+    {
+        "BRANCH_NAME": "JAIN BAZAR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Chowk Chabutra",
+        "BRANCH_CODE": "00038"
+    },
+    {
+        "BRANCH_NAME": "JANIPUR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Near State Bank Of India",
+        "BRANCH_CODE": "00039"
+    },
+    {
+        "BRANCH_NAME": "TRIKUTANAGAR,JAMMU BR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Market Trikuta Nagar",
+        "BRANCH_CODE": "00089"
+    },
+    {
+        "BRANCH_NAME": "SUPER BAZAR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "J&K Whole Sale Super Bazar",
+        "BRANCH_CODE": "00084"
+    },
+    {
+        "BRANCH_NAME": "CHANNI HIMMAT",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Near Railway Line Channi Himmat",
+        "BRANCH_CODE": "00019"
+    },
+    {
+        "BRANCH_NAME": "RESHAM GHAR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Resham Ghar Colony",
+        "BRANCH_CODE": "00072"
+    },
+    {
+        "BRANCH_NAME": "PALOURA",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Near J&K Bank Paloura Top",
+        "BRANCH_CODE": "00060"
+    },
+    {
+        "BRANCH_NAME": "TALAB TILLO",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Chowk Talab Tillo",
+        "BRANCH_CODE": "00086"
+    },
+    {
+        "BRANCH_NAME": "ARNIA BR.",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Arnia",
+        "BRANCH_CODE": "00006"
+    },
+    {
+        "BRANCH_NAME": "AKHNOOR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Near Sbi Bank Akhnoor",
+        "BRANCH_CODE": "00003"
+    },
+    {
+        "BRANCH_NAME": "SAINIK COLONY,JAMMU BR.",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Near Sbi Bank Sainik Colony",
+        "BRANCH_CODE": "00073"
+    },
+    {
+        "BRANCH_NAME": "KHOUR",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Khour",
+        "BRANCH_CODE": "00049"
+    },
+    {
+        "BRANCH_NAME": "PHALLAN MANDAL",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Ph Mandal",
+        "BRANCH_CODE": "00063"
+    },
+    {
+        "BRANCH_NAME": "DHANSAL",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Near Block Office Dansal",
+        "BRANCH_CODE": "00022"
+    },
+    {
+        "BRANCH_NAME": "SIDHRA",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Sidhra",
+        "BRANCH_CODE": "00081"
+    },
+    {
+        "BRANCH_NAME": "BISHNAH",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Bishnah",
+        "BRANCH_CODE": "00015"
+    },
+    {
+        "BRANCH_NAME": "RANBIRSINGH PURA",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Rs Pura",
+        "BRANCH_CODE": "00070"
+    },
+    {
+        "BRANCH_NAME": "AMBH GAROTTA",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Near Police Post Gharota",
+        "BRANCH_CODE": "00004"
+    },
+    {
+        "BRANCH_NAME": "MISHRIWALA",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Mishriwala",
+        "BRANCH_CODE": "00057"
+    },
+    {
+        "BRANCH_NAME": "PARGWAL BRANCH",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Pargwal",
+        "BRANCH_CODE": "00062"
+    },
+    {
+        "BRANCH_NAME": "JOURIAN",
+        "REGIONAL_OFFICE": "Rail Head Complex",
+        "DISTRICT": "Jammu",
+        "ADDRESS": "Main Bazar Jourian",
+        "BRANCH_CODE": "00042"
+    },
+    {
+        "BRANCH_NAME": "KATHUA",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Kathua",
+        "BRANCH_CODE": "00047"
+    },
+    {
+        "BRANCH_NAME": "KALI BARI",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Kali Bari",
+        "BRANCH_CODE": "00046"
+    },
+    {
+        "BRANCH_NAME": "HIRA NAGAR",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Hiranagar",
+        "BRANCH_CODE": "00037"
+    },
+    {
+        "BRANCH_NAME": "BILLAWAR",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Billawar",
+        "BRANCH_CODE": "00014"
+    },
+    {
+        "BRANCH_NAME": "BANIHAL",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Bani",
+        "BRANCH_CODE": "00007"
+    },
+    {
+        "BRANCH_NAME": "BRANCH BARNOTI",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Barnoti",
+        "BRANCH_CODE": "00016"
+    },
+    {
+        "BRANCH_NAME": "BASHOLI",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Basholi",
+        "BRANCH_CODE": "00010"
+    },
+    {
+        "BRANCH_NAME": "SANJI MORH",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Sanjimorh",
+        "BRANCH_CODE": "00077"
+    },
+    {
+        "BRANCH_NAME": "GURA KALYAL",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Gurah Kalyal",
+        "BRANCH_CODE": "00036"
+    },
+    {
+        "BRANCH_NAME": "K. P. DUNGRA",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar K.P Dungra",
+        "BRANCH_CODE": "00043"
+    },
+    {
+        "BRANCH_NAME": "SALALPUR",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Salalpur",
+        "BRANCH_CODE": "00074"
+    },
+    {
+        "BRANCH_NAME": "CHADWAL",
+        "REGIONAL_OFFICE": "Kathua",
+        "DISTRICT": "Kathua",
+        "ADDRESS": "Main Bazar Chadwal",
+        "BRANCH_CODE": "00017"
+    },
+    {
+        "BRANCH_NAME": "KISHTWAR",
+        "REGIONAL_OFFICE": "Kishtwar",
+        "DISTRICT": "Kishtwar",
+        "ADDRESS": "Main Bazar Kishtwar",
+        "BRANCH_CODE": "00051"
+    },
+    {
+        "BRANCH_NAME": "POONCH",
+        "REGIONAL_OFFICE": "Poonch",
+        "DISTRICT": "Poonch",
+        "ADDRESS": "Main Bazar Poonch",
+        "BRANCH_CODE": "00064"
+    },
+    {
+        "BRANCH_NAME": "MANDI",
+        "REGIONAL_OFFICE": "Poonch",
+        "DISTRICT": "Poonch",
+        "ADDRESS": "Main Bazar Mandi",
+        "BRANCH_CODE": "00054"
+    },
+    {
+        "BRANCH_NAME": "MENDHAR",
+        "REGIONAL_OFFICE": "Poonch",
+        "DISTRICT": "Poonch",
+        "ADDRESS": "Main Bazar Mendhar",
+        "BRANCH_CODE": "00056"
+    },
+    {
+        "BRANCH_NAME": "SURANKOTE",
+        "REGIONAL_OFFICE": "Poonch",
+        "DISTRICT": "Poonch",
+        "ADDRESS": "Main Bazar Surankote",
+        "BRANCH_CODE": "00085"
+    },
+    {
+        "BRANCH_NAME": "CHANDAK",
+        "REGIONAL_OFFICE": "Poonch",
+        "DISTRICT": "Poonch",
+        "ADDRESS": "Main Bazar Chandak",
+        "BRANCH_CODE": "00018"
+    },
+    {
+        "BRANCH_NAME": "RAJOURI",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Rajouri",
+        "BRANCH_CODE": "00066"
+    },
+    {
+        "BRANCH_NAME": "NOWSHERA",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Nowshera",
+        "BRANCH_CODE": "00058"
+    },
+    {
+        "BRANCH_NAME": "SUNDERBANI",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Sunderbani",
+        "BRANCH_CODE": "00083"
+    },
+    {
+        "BRANCH_NAME": "KALAKOTE",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Kalakote",
+        "BRANCH_CODE": "00045"
+    },
+    {
+        "BRANCH_NAME": "THANA MANDI",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Thanamandi",
+        "BRANCH_CODE": "00087"
+    },
+    {
+        "BRANCH_NAME": "DARHAL",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Dharal",
+        "BRANCH_CODE": "00021"
+    },
+    {
+        "BRANCH_NAME": "KOTRANKA BRANCH",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Koteronka",
+        "BRANCH_CODE": "00052"
+    },
+    {
+        "BRANCH_NAME": "JAWAHAR NAGAR",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Jawahar Nagar",
+        "BRANCH_CODE": "00041"
+    },
+    {
+        "BRANCH_NAME": "BHAMBLA",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Bhambla",
+        "BRANCH_CODE": "00013"
+    },
+    {
+        "BRANCH_NAME": "GHAMBIR BRAHMANA",
+        "REGIONAL_OFFICE": "Rajouri",
+        "DISTRICT": "Rajouri",
+        "ADDRESS": "Main Bazar Ghambir Brahmna",
+        "BRANCH_CODE": "00033"
+    },
+    {
+        "BRANCH_NAME": "BATOTE",
+        "REGIONAL_OFFICE": "Ramban",
+        "DISTRICT": "Ramban",
+        "ADDRESS": "Main Bazar Batote",
+        "BRANCH_CODE": "00011"
+    },
+    {
+        "BRANCH_NAME": "RAMBAN",
+        "REGIONAL_OFFICE": "Ramban",
+        "DISTRICT": "Ramban",
+        "ADDRESS": "Main Bazar Ramban",
+        "BRANCH_CODE": "00067"
+    },
+    {
+        "BRANCH_NAME": "GOOL",
+        "REGIONAL_OFFICE": "Ramban",
+        "DISTRICT": "Ramban",
+        "ADDRESS": "Main Bazar Gool",
+        "BRANCH_CODE": "00034"
+    },
+    {
+        "BRANCH_NAME": "POUNI BRANCH",
+        "REGIONAL_OFFICE": "Reasi",
+        "DISTRICT": "Reasi",
+        "ADDRESS": "Main Bazar Pouni",
+        "BRANCH_CODE": "00065"
+    },
+    {
+        "BRANCH_NAME": "REASI",
+        "REGIONAL_OFFICE": "Reasi",
+        "DISTRICT": "Reasi",
+        "ADDRESS": "Main Bazar Reasi",
+        "BRANCH_CODE": "00071"
+    },
+    {
+        "BRANCH_NAME": "KATRA",
+        "REGIONAL_OFFICE": "Reasi",
+        "DISTRICT": "Reasi",
+        "ADDRESS": "Main Bazar Katra",
+        "BRANCH_CODE": "00048"
+    },
+    {
+        "BRANCH_NAME": "ARNAS",
+        "REGIONAL_OFFICE": "Reasi",
+        "DISTRICT": "Reasi",
+        "ADDRESS": "Main Bazar Arnas",
+        "BRANCH_CODE": "00005"
+    },
+    {
+        "BRANCH_NAME": "RAMGARH",
+        "REGIONAL_OFFICE": "Samba",
+        "DISTRICT": "Samba",
+        "ADDRESS": "Main Bazar Ramghar",
+        "BRANCH_CODE": "00068"
+    },
+    {
+        "BRANCH_NAME": "SAMBA",
+        "REGIONAL_OFFICE": "Samba",
+        "DISTRICT": "Samba",
+        "ADDRESS": "Main Bazar Samba",
+        "BRANCH_CODE": "00075"
+    },
+    {
+        "BRANCH_NAME": "VIJAYPUR",
+        "REGIONAL_OFFICE": "Samba",
+        "DISTRICT": "Samba",
+        "ADDRESS": "Main Bazar Vijaypur",
+        "BRANCH_CODE": "00091"
+    },
+    {
+        "BRANCH_NAME": "BARI BRAHMANA",
+        "REGIONAL_OFFICE": "Samba",
+        "DISTRICT": "Samba",
+        "ADDRESS": "Main Bazar Bari Brahmana",
+        "BRANCH_CODE": "00009"
+    },
+    {
+        "BRANCH_NAME": "JATWAL",
+        "REGIONAL_OFFICE": "Samba",
+        "DISTRICT": "Samba",
+        "ADDRESS": "Main Bazar Jatwal",
+        "BRANCH_CODE": "00040"
+    },
+    {
+        "BRANCH_NAME": "NUD",
+        "REGIONAL_OFFICE": "Samba",
+        "DISTRICT": "Samba",
+        "ADDRESS": "Main Bazar Nud",
+        "BRANCH_CODE": "00059"
+    },
+    {
+        "BRANCH_NAME": "SUMB",
+        "REGIONAL_OFFICE": "Samba",
+        "DISTRICT": "Samba",
+        "ADDRESS": "Main Bazar Sumb",
+        "BRANCH_CODE": "00082"
+    },
+    {
+        "BRANCH_NAME": "GHAGWAL BRANCH",
+        "REGIONAL_OFFICE": "Samba",
+        "DISTRICT": "Samba",
+        "ADDRESS": "Main Bazar Ghagwal",
+        "BRANCH_CODE": "00032"
+    },
+    {
+        "BRANCH_NAME": "Garhi",
+        "REGIONAL_OFFICE": "Udhampur",
+        "DISTRICT": "Udhampur",
+        "ADDRESS": "Main Bazar Ghari",
+        "BRANCH_CODE": "00035"
+    },
+    {
+        "BRANCH_NAME": "RAMNAGAR BRANCH",
+        "REGIONAL_OFFICE": "Udhampur",
+        "DISTRICT": "Udhampur",
+        "ADDRESS": "Near Bus Stand Ramnagar",
+        "BRANCH_CODE": "00069"
+    },
+    {
+        "BRANCH_NAME": "UDHAMPUR",
+        "REGIONAL_OFFICE": "Udhampur",
+        "DISTRICT": "Udhampur",
+        "ADDRESS": "Gole Market Udhampur",
+        "BRANCH_CODE": "00090"
+    },
+    {
+        "BRANCH_NAME": "MANWAL BR",
+        "REGIONAL_OFFICE": "Udhampur",
+        "DISTRICT": "Udhampur",
+        "ADDRESS": "Main Market Manwal",
+        "BRANCH_CODE": "00055"
+    },
+    {
+        "BRANCH_NAME": "LATTI",
+        "REGIONAL_OFFICE": "Udhampur",
+        "DISTRICT": "Udhampur",
+        "ADDRESS": "Main Bazar Latti",
+        "BRANCH_CODE": "00053"
+    },
+    {
+        "BRANCH_NAME": "KISHANPUR",
+        "REGIONAL_OFFICE": "Udhampur",
+        "DISTRICT": "Udhampur",
+        "ADDRESS": "Main Bazar Kishanpurmanwal",
+        "BRANCH_CODE": "00050"
+    },
+    {
+        "BRANCH_NAME": "CHINANI",
+        "REGIONAL_OFFICE": "Udhampur",
+        "DISTRICT": "Udhampur",
+        "ADDRESS": "Main Bazar Chenani",
+        "BRANCH_CODE": "00020"
+    },
+    {
+        "BRANCH_NAME": "BHADERWAH",
+        "REGIONAL_OFFICE": "Doda",
+        "DISTRICT": "Doda",
+        "ADDRESS": "Main Bazar Bhaderwah",
+        "BRANCH_CODE": "00012"
+    },
+    {
+        "BRANCH_NAME": "DODA",
+        "REGIONAL_OFFICE": "Doda",
+        "DISTRICT": "Doda",
+        "ADDRESS": "Main Bazar Doda",
+        "BRANCH_CODE": "00024"
+    },
+    {
+        "BRANCH_NAME": "THATHRI BR",
+        "REGIONAL_OFFICE": "Doda",
+        "DISTRICT": "Doda",
+        "ADDRESS": "Main Bazar Thathri",
+        "BRANCH_CODE": "00088"
+    },
+    {
+        "BRANCH_NAME": "GANDOH BR",
+        "REGIONAL_OFFICE": "Doda",
+        "DISTRICT": "Doda",
+        "ADDRESS": "Main Bazar Gandoh",
+        "BRANCH_CODE": "00031"
+    },
+    {
+        "BRANCH_NAME": "KAHARA",
+        "REGIONAL_OFFICE": "Doda",
+        "DISTRICT": "Doda",
+        "ADDRESS": "Main Bazar Khara Bhellessa",
+        "BRANCH_CODE": "00044"
+    },
+    {
+        "BRANCH_NAME": "SANGALDAN",
+        "REGIONAL_OFFICE": "Doda",
+        "DISTRICT": "Doda",
+        "ADDRESS": "Main Bazar Sangaldan",
+        "BRANCH_CODE": "00076"
+    },
+    {
+        "BRANCH_NAME": "HEAD OFFICE",
+        "REGIONAL_OFFICE": "Head Office",
+        "DISTRICT": "Jammu",
+        "ADDRESS": null,
+        "BRANCH_CODE": "00001"
+    },
+    {
+        "BRANCH_NAME": "BANNI",
+        "REGIONAL_OFFICE": "Unassigned",
+        "DISTRICT": "Unassigned",
+        "ADDRESS": "Data imported from bank DB",
+        "BRANCH_CODE": "00008"
+    },
+    {
+        "BRANCH_NAME": "EXT. COUNTER BUDDAL",
+        "REGIONAL_OFFICE": "Unassigned",
+        "DISTRICT": "Unassigned",
+        "ADDRESS": "Data imported from bank DB",
+        "BRANCH_CODE": "00025"
+    },
+    {
+        "BRANCH_NAME": "EXT. COUNTER JAKH",
+        "REGIONAL_OFFICE": "Unassigned",
+        "DISTRICT": "Unassigned",
+        "ADDRESS": "Data imported from bank DB",
+        "BRANCH_CODE": "00026"
+    },
+    {
+        "BRANCH_NAME": "EXT. COUNTER MAWA",
+        "REGIONAL_OFFICE": "Unassigned",
+        "DISTRICT": "Unassigned",
+        "ADDRESS": "Data imported from bank DB",
+        "BRANCH_CODE": "00027"
+    },
+    {
+        "BRANCH_NAME": "EXT. COUNTER SAI KALAN",
+        "REGIONAL_OFFICE": "Unassigned",
+        "DISTRICT": "Unassigned",
+        "ADDRESS": "Data imported from bank DB",
+        "BRANCH_CODE": "00028"
+    },
+    {
+        "BRANCH_NAME": "EXT. COUNTER THADA KALYAL",
+        "REGIONAL_OFFICE": "Unassigned",
+        "DISTRICT": "Unassigned",
+        "ADDRESS": "Data imported from bank DB",
+        "BRANCH_CODE": "00029"
+    }
+]

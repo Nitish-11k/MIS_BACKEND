@@ -40,6 +40,59 @@ def get_db_connection():
         conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
     return pyodbc.connect(conn_str)
 
+def init_branch_network():
+    """Initializes the BRANCH_NETWORK table if it doesn't exist."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if table exists
+        cursor.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'BRANCH_NETWORK'")
+        if cursor.fetchone()[0] == 0:
+            print("BRANCH_NETWORK table not found. Creating it...")
+            cursor.execute("""
+                CREATE TABLE BRANCH_NETWORK (
+                    ID INT IDENTITY(1,1) PRIMARY KEY,
+                    BRANCH_NAME VARCHAR(255) NOT NULL,
+                    REGIONAL_OFFICE VARCHAR(255),
+                    DISTRICT VARCHAR(255),
+                    ADDRESS TEXT,
+                    BRANCH_CODE VARCHAR(50)
+                )
+            """)
+            conn.commit()
+            
+            # Populate with seed data if available
+            seed_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'branch_network_seed.json')
+            if os.path.exists(seed_path):
+                print(f"Populating BRANCH_NETWORK from seed data: {seed_path}")
+                with open(seed_path, 'r', encoding='utf-8') as f:
+                    seed_data = json.load(f)
+                    
+                for branch in seed_data:
+                    cursor.execute("""
+                        INSERT INTO BRANCH_NETWORK (BRANCH_NAME, REGIONAL_OFFICE, DISTRICT, ADDRESS, BRANCH_CODE)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        branch.get('BRANCH_NAME'),
+                        branch.get('REGIONAL_OFFICE'),
+                        branch.get('DISTRICT'),
+                        branch.get('ADDRESS'),
+                        branch.get('BRANCH_CODE')
+                    ))
+                conn.commit()
+                print(f"Successfully inserted {len(seed_data)} branches.")
+            else:
+                print("Seed data not found. BRANCH_NETWORK created empty.")
+        conn.close()
+    except Exception as e:
+        print(f"Error initializing BRANCH_NETWORK: {e}")
+        traceback.print_exc()
+
+@app.on_event("startup")
+async def startup_event():
+    init_branch_network()
+
 # --- UPLOAD ENGINE STATE ---
 upload_state = {
     "is_running": False,
