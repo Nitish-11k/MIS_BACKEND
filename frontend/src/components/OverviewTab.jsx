@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, Legend, LabelList
 } from 'recharts';
 import KPICard from './KPICard';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ShieldCheck } from 'lucide-react';
 
 const COLORS = ['#0F172A', '#D4AF37', '#10B981', '#8B5CF6', '#EF4444'];
 
