@@ -18,14 +18,15 @@ def parse(raw_lines):
     header_lines_for_parsing = []
     
     if dash_indices:
-        target_idx = dash_indices[0]
-        # Find the last dash line in the contiguous header block (each within 12 lines of previous)
-        for idx in dash_indices[1:]:
-            if idx - target_idx <= 12:
+        target_idx = -1
+        for idx in dash_indices:
+            if idx > 0 and '|' in lines[idx-1]:
                 target_idx = idx
-            else:
                 break
                 
+        if target_idx == -1:
+            target_idx = dash_indices[0]
+        
         target_line = lines[target_idx]
         
         # Capture up to 4 lines above as header lines
@@ -124,10 +125,19 @@ def parse(raw_lines):
         # Schema only row
         row = {}
         if col_indices:
+            used_cols = set()
             for idx, (s, e) in enumerate(col_indices):
                 col_name = headers[idx] if idx < len(headers) else f"COL_{idx}"
                 col_name = "".join(c for c in col_name if c.isalnum() or c == '_').upper()
                 if not col_name: col_name = f"COL_{idx}"
+                
+                original_col_name = col_name
+                counter = 1
+                while col_name in used_cols:
+                    col_name = f"{original_col_name}_{counter}"
+                    counter += 1
+                used_cols.add(col_name)
+                
                 row[col_name] = ""
         else:
             row["RAW_LINE"] = ""

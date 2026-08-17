@@ -15,6 +15,7 @@ from app.parser.formats import id_users_logged_no_transactions_lond2482, id_user
 from app.parser.formats import listof_npa_accounts_lond2572
 from app.parser.formats import agewise_report_of_sys_susp_gend7053, advicefortd
 from app.parser.formats import loans_sanction_letter
+from app.parser.formats import maturity_list_depd0623, overdue_notice_lond2384, inventory_report, int_paid_proj
 
 REGISTRY = {
     "ACTCLS-01": account_closed_report.parse,
@@ -71,4 +72,8 @@ REGISTRY = {
     "GL7053-01": agewise_report_of_sys_susp_gend7053.parse,
     "ADVICEFORTD": advicefortd.parse,
     "LOANS_SANCTION_LETTER": loans_sanction_letter.parse,
+    "IN0623-01": maturity_list_depd0623.parse,
+    "OVERDUE_NOTICE": overdue_notice_lond2384.parse,
+    "VP7634": inventory_report.parse,
+    "DEPD637T": int_paid_proj.parse,
 }

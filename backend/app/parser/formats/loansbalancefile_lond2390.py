@@ -33,7 +33,7 @@ def parse(raw_lines):
             rest = stripped[m1.end():].strip()
             
             # The remaining is: TYPE (string), NAME (string), and then numeric/date fields
-            m2 = re.search(r'\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{3}|[-0-9,]+\.\d+)\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{2})\s+(\d{2}-\d{2}-\d{4})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\w+)\s+(\w+)\s+([-0-9,]+\.\d{2})\s+(\w+)\s+(\w+)\s+(\w+)', rest)
+            m2 = re.search(r'\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{3}|[-0-9,]+\.\d+)\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{2})\s+([-0-9,]+\.\d{2})\s+(\d{2}-\d{2}-\d{4})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\w+)\s+(\w+)\s+([-0-9,]+\.\d{2})\s+(\w+)(?:\s+([A-Za-z]+))?\s+(\w+)', rest)
             
             if m2:
                 row['LIMIT'] = m2.group(1)
@@ -49,7 +49,7 @@ def parse(raw_lines):
                 row['OLD_IRAC'] = m2.group(11)
                 row['ADV_PAID_AMT'] = m2.group(12)
                 row['ARREAR_COND'] = m2.group(13)
-                row['CURRENCY'] = m2.group(14)
+                row['CURRENCY'] = m2.group(14) or ""
                 row['ACCT_MTAIN_BRCH'] = m2.group(15)
                 
                 # Everything before LIMIT is TYPE and NAME

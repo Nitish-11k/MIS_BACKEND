@@ -167,9 +167,20 @@ def scan_folder(req: UploadRequest):
         metadata = extract_metadata(lines)
         report_id = metadata.get("REPORT_ID", "UNKNOWN")
         
+        base_name = os.path.basename(filepath).lower()
+        
+        # Disambiguate multi-report IDs based on filename
+        if report_id == "GN7484":
+            if "transfer_supplementary" in base_name:
+                report_id = "GN7484_3"
+            elif "supplimentary_report" in base_name:
+                report_id = "GN7484_2"
+        elif report_id == "GN7516":
+            if "transfer_supplementary" in base_name:
+                report_id = "GN7516_2"
+                
         if report_id == "UNKNOWN" or report_id not in REGISTRY:
-            base_name = os.path.basename(filepath).lower()
-            for k in REGISTRY.keys():
+            for k in sorted(REGISTRY.keys(), key=len, reverse=True):
                 if k.lower() in base_name:
                     report_id = k
                     break

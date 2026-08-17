@@ -25,7 +25,7 @@ def parse(raw_lines):
                 target_idx = idx
             else:
                 break
-                
+        
         target_line = lines[target_idx]
         
         # Capture up to 4 lines above as header lines

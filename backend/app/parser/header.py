@@ -115,7 +115,10 @@ def extract_columns_from_headers(header_lines, data_lines, separator_line=None):
         # Join multi-line hierarchical headers
         raw_name = "_".join(header_parts)
         if not raw_name:
-            raw_name = "UNKNOWN_COL"
+            if final_columns:
+                # Merge with the previous column to handle data spillover
+                final_columns[-1][2] = e
+            continue
             
         clean_name = clean_column_name(raw_name, existing_names)
         final_columns.append([clean_name, s, e])

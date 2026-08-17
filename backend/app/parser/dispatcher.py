@@ -24,10 +24,21 @@ def process_file(filepath):
     metadata = extract_metadata(raw_lines)
     report_id = metadata.get("REPORT_ID", "UNKNOWN")
     
+    base_name = os.path.basename(filepath).lower()
+    
+    # Disambiguate multi-report IDs based on filename
+    if report_id == "GN7484":
+        if "transfer_supplementary" in base_name:
+            report_id = "GN7484_3"
+        elif "supplimentary_report" in base_name:
+            report_id = "GN7484_2"
+    elif report_id == "GN7516":
+        if "transfer_supplementary" in base_name:
+            report_id = "GN7516_2"
+    
     if report_id == "UNKNOWN" or report_id not in REGISTRY:
         # Fallback to filename matching if report_id is unknown or not in registry
-        base_name = os.path.basename(filepath).lower()
-        for k in REGISTRY.keys():
+        for k in sorted(REGISTRY.keys(), key=len, reverse=True):
             if k.lower() in base_name:
                 report_id = k
                 print(f"Fallback matched {k} from filename {base_name}")
@@ -79,6 +90,11 @@ def process_file(filepath):
                 r["original_id"] = r.pop("ID")
             if "id" in r:
                 r["original_id"] = r.pop("id")
+                
+            # Pad missing columns with empty string to prevent SQL insert failures
+            for col in column_names:
+                if col not in r:
+                    r[col] = ""
             
         insert_rows(table, data_rows, primary_key_columns)
     else:
