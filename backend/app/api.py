@@ -359,12 +359,12 @@ def get_notifications(branch_code: str = "ALL"):
             
         cursor.execute(f"""
             SELECT TOP 1 
-                NPA_STMT.BRANCH_CODE,
-                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = NPA_STMT.BRANCH_CODE), NPA_STMT.BRANCH_CODE) as BRANCH_NAME,
-                SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa
-            FROM NPA_STMT
+                LIST_OF_NPA_ACCOUNTS.BRANCH_CODE,
+                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = LIST_OF_NPA_ACCOUNTS.BRANCH_CODE), LIST_OF_NPA_ACCOUNTS.BRANCH_CODE) as BRANCH_NAME,
+                SUM(TRY_CAST(REPLACE(ISNULL(OUTSTANDING, '0'), ',', '') AS FLOAT)) as npa
+            FROM LIST_OF_NPA_ACCOUNTS
             {where_branch}
-            GROUP BY NPA_STMT.BRANCH_CODE
+            GROUP BY LIST_OF_NPA_ACCOUNTS.BRANCH_CODE
             ORDER BY npa DESC
         """, params)
         npa_row = cursor.fetchone()
@@ -840,7 +840,7 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL"):
         # =========================================================
         where_npa, params_npa = get_date_filter_sql(
             period,
-            "NPA_STMT",
+            "LIST_OF_NPA_ACCOUNTS",
             "WHERE"
         )
 
@@ -858,13 +858,13 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL"):
                 SUM(
                     TRY_CAST(
                         REPLACE(
-                            ISNULL(BAL_OUTSTAND, '0'),
+                            ISNULL(OUTSTANDING, '0'),
                             ',',
                             ''
                         ) AS FLOAT
                     )
                 )
-            FROM NPA_STMT
+            FROM LIST_OF_NPA_ACCOUNTS
             {where_npa}
             """,
             params_npa,
@@ -1389,7 +1389,7 @@ def get_loan_npa_summary(branch_code: str = "ALL"):
         total_loans = 0
         
     try:
-        cursor.execute(f"SELECT SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) FROM NPA_STMT {where_clause}", params)
+        cursor.execute(f"SELECT SUM(TRY_CAST(REPLACE(ISNULL(OUTSTANDING, '0'), ',', '') AS FLOAT)) FROM LIST_OF_NPA_ACCOUNTS {where_clause}", params)
         total_npa_outstanding = cursor.fetchone()[0] or 0
     except:
         total_npa_outstanding = 0
@@ -1407,25 +1407,25 @@ def get_npa_branch_wise(branch_code: str = "ALL", period: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    where_npa, params_npa = get_date_filter_sql(period, "NPA_STMT", "WHERE")
+    where_npa, params_npa = get_date_filter_sql(period, "LIST_OF_NPA_ACCOUNTS", "WHERE")
     
     if branch_code != "ALL":
-        where_npa += " AND NPA_STMT.BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE NPA_STMT.BRANCH_CODE = ?"
+        where_npa += " AND LIST_OF_NPA_ACCOUNTS.BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE LIST_OF_NPA_ACCOUNTS.BRANCH_CODE = ?"
         params_npa.append(branch_code)
         
     if "WHERE" in where_npa:
-        where_npa += " AND NPA_STMT.BRANCH_CODE IS NOT NULL AND NPA_STMT.BRANCH_CODE != ''"
+        where_npa += " AND LIST_OF_NPA_ACCOUNTS.BRANCH_CODE IS NOT NULL AND LIST_OF_NPA_ACCOUNTS.BRANCH_CODE != ''"
     else:
-        where_npa = "WHERE NPA_STMT.BRANCH_CODE IS NOT NULL AND NPA_STMT.BRANCH_CODE != ''"
+        where_npa = "WHERE LIST_OF_NPA_ACCOUNTS.BRANCH_CODE IS NOT NULL AND LIST_OF_NPA_ACCOUNTS.BRANCH_CODE != ''"
         
     try:
         cursor.execute(f"""
             SELECT 
-                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = NPA_STMT.BRANCH_CODE), NPA_STMT.BRANCH_CODE) as BRANCH_NAME,
-                SUM(TRY_CAST(BAL_OUTSTAND AS FLOAT)) as npa
-            FROM NPA_STMT
+                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = LIST_OF_NPA_ACCOUNTS.BRANCH_CODE), LIST_OF_NPA_ACCOUNTS.BRANCH_CODE) as BRANCH_NAME,
+                SUM(TRY_CAST(REPLACE(ISNULL(OUTSTANDING, '0'), ',', '') AS FLOAT)) as npa
+            FROM LIST_OF_NPA_ACCOUNTS
             {where_npa}
-            GROUP BY NPA_STMT.BRANCH_CODE
+            GROUP BY LIST_OF_NPA_ACCOUNTS.BRANCH_CODE
             ORDER BY npa DESC
         """, params_npa)
         rows = cursor.fetchall()
