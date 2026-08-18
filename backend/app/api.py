@@ -2335,3 +2335,72 @@ def audit_exceptions(branch_code: Optional[str] = None, period: str = "ALL", sta
     except Exception as e:
         print(f"Error fetching audit exceptions: {e}")
         return []
+
+
+@app.get("/api/loans-dashboard")
+async def get_loans_dashboard(branch_code: str = "ALL", period: str = "all_time", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Build where clause for date filtering (using get_date_filter_sql)
+        # Note: Since BAL_IN_LOAN_ACC_GLCC_WISE_SUM doesn't have PROC_DATE in all setups, 
+        # we might just filter if needed, but usually GLCC wise sum is just a snapshot.
+        # For full accuracy, let's filter if PROC_DATE exists.
+        
+        # 1. Total Loans
+        query_total = "SELECT SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM"
+        where_glcc, params_glcc = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_SUM", "WHERE", start_date=start_date, end_date=end_date)
+        if branch_code != "ALL":
+            where_glcc += " AND BRANCH_CODE = ?" if "WHERE" in where_glcc else " WHERE BRANCH_CODE = ?"
+            params_glcc.append(branch_code)
+            
+        cursor.execute(query_total + where_glcc, params_glcc)
+        total_loans = cursor.fetchone()[0] or 0.0
+
+        # 2. Total NPA
+        query_npa = "SELECT SUM(TRY_CAST(REPLACE(OUTSTANDING, ',', '') AS FLOAT)) FROM LIST_OF_NPA_ACCOUNTS"
+        where_npa, params_npa = get_date_filter_sql(period, "LIST_OF_NPA_ACCOUNTS", "WHERE", start_date=start_date, end_date=end_date)
+        if branch_code != "ALL":
+            where_npa += " AND BRANCH_CODE = ?" if "WHERE" in where_npa else " WHERE BRANCH_CODE = ?"
+            params_npa.append(branch_code)
+            
+        cursor.execute(query_npa + where_npa, params_npa)
+        total_npa = cursor.fetchone()[0] or 0.0
+
+        # 3. Total Irregular
+        query_irreg = "SELECT SUM(TRY_CAST(REPLACE(IRREGULARITY, ',', '') AS FLOAT)) FROM LOAN_IRREGULAR_REPORT"
+        where_irreg, params_irreg = get_date_filter_sql(period, "LOAN_IRREGULAR_REPORT", "WHERE", start_date=start_date, end_date=end_date)
+        if branch_code != "ALL":
+            where_irreg += " AND BRANCH_CODE = ?" if "WHERE" in where_irreg else " WHERE BRANCH_CODE = ?"
+            params_irreg.append(branch_code)
+            
+        cursor.execute(query_irreg + where_irreg, params_irreg)
+        total_irreg = cursor.fetchone()[0] or 0.0
+
+        # 4. Product-wise aggregate
+        query_prod = "SELECT NAME, SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) as sum_amt FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM " + where_glcc + " GROUP BY NAME ORDER BY sum_amt DESC"
+        cursor.execute(query_prod, params_glcc)
+        products = [{"name": row[0], "value": float(row[1] or 0)} for row in cursor.fetchall() if row[0] and row[1]]
+
+        # 5. Branch-wise aggregate
+        query_branch = "SELECT BRANCH_NAME, SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) as sum_amt FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM " + where_glcc + " GROUP BY BRANCH_NAME ORDER BY sum_amt DESC"
+        cursor.execute(query_branch, params_glcc)
+        branches = [{"name": row[0], "value": float(row[1] or 0)} for row in cursor.fetchall() if row[0] and row[1]]
+        
+        conn.close()
+        
+        return {
+            "overview": {
+                "total_loans": float(total_loans),
+                "total_npa": float(total_npa),
+                "total_irregular": float(total_irreg)
+            },
+            "products": products,
+            "branches": branches
+        }
+    except Exception as e:
+        print("Error in /api/loans-dashboard:", str(e))
+        traceback.print_exc()
+        return {"error": str(e), "overview": {}, "products": [], "branches": []}
+
