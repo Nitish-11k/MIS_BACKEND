@@ -9,7 +9,7 @@ const BranchNetworkTab = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/branch-network')
+    fetch('http://127.0.0.1:8000/api/branch-network')
       .then(res => res.json())
       .then(fetchedData => {
         setData(fetchedData);
@@ -239,3 +239,4 @@ const BranchNetworkTab = () => {
 };
 
 export default BranchNetworkTab;
+

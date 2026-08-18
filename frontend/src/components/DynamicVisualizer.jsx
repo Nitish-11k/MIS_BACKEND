@@ -58,7 +58,7 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
     setLoading(true);
     const activePeriod = exactDate || period;
     const queryParams = new URLSearchParams({ branch_code: branchCode, period: activePeriod }).toString();
-    fetch(`http://localhost:8000/api/visualize/${tableName}?${queryParams}`)
+    fetch(`http://127.0.0.1:8000/api/visualize/${tableName}?${queryParams}`)
       .then(res => res.json())
       .then(result => {
         if (result && result.length > 0) {
@@ -269,3 +269,4 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
 };
 
 export default DynamicVisualizer;
+
