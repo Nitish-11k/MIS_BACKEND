@@ -10,7 +10,7 @@ const NpaManagementTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
     setLoading(true);
     let activePeriod = exactDate || selectedPeriod;
 
-    fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`)
+    fetch(`http://127.0.0.1:8000/api/npa-branch-wise?branch_code=${selectedBranch}&period=${activePeriod}`)
       .then(res => res.json())
       .then(data => {
         setNpaData(Array.isArray(data) ? data.map(d => ({ ...d, NPA: (d.NPA||0)/100000 })) : []);
@@ -66,3 +66,4 @@ const NpaManagementTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
 };
 
 export default NpaManagementTab;
+

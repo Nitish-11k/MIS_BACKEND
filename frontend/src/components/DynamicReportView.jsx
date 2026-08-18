@@ -36,7 +36,7 @@ const DynamicReportView = ({ tableName, selectedBranch = 'ALL' }) => {
   useEffect(() => {
     if (!tableName) return;
     setLoading(true);
-    fetch(`http://localhost:8000/api/report-stats/${tableName}?branch_code=${selectedBranch}`)
+    fetch(`http://127.0.0.1:8000/api/report-stats/${tableName}?branch_code=${selectedBranch}`)
       .then(res => res.json())
       .then(data => {
         setStats(data);
@@ -146,3 +146,4 @@ const DynamicReportView = ({ tableName, selectedBranch = 'ALL' }) => {
 };
 
 export default DynamicReportView;
+

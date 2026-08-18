@@ -34,7 +34,7 @@ export const DepositsByTypeChart = ({ selectedBranch = 'ALL' }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/deposits-by-type?branch_code=${selectedBranch}`)
+    fetch(`http://127.0.0.1:8000/api/deposits-by-type?branch_code=${selectedBranch}`)
       .then(res => res.json())
       .then(resData => { setData(Array.isArray(resData) ? resData : []); setLoading(false); })
       .catch(() => { setData([]); setLoading(false); });
@@ -67,7 +67,7 @@ export const GLDistributionChart = ({ selectedBranch = 'ALL' }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/gl-summary?branch_code=${selectedBranch}`)
+    fetch(`http://127.0.0.1:8000/api/gl-summary?branch_code=${selectedBranch}`)
       .then(res => res.json())
       .then(resData => { setData(Array.isArray(resData) ? resData : []); setLoading(false); })
       .catch(() => { setData([]); setLoading(false); });
@@ -115,7 +115,7 @@ export const ProductwiseChart = ({ selectedBranch = 'ALL' }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/productwise-summary?branch_code=${selectedBranch}`)
+    fetch(`http://127.0.0.1:8000/api/productwise-summary?branch_code=${selectedBranch}`)
       .then(res => res.json())
       .then(resData => { setData(Array.isArray(resData) ? resData : []); setLoading(false); })
       .catch(() => { setData([]); setLoading(false); });
@@ -149,7 +149,7 @@ export const GLCCSummaryChart = ({ selectedBranch = 'ALL' }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/glcc-summary?branch_code=${selectedBranch}`)
+    fetch(`http://127.0.0.1:8000/api/glcc-summary?branch_code=${selectedBranch}`)
       .then(res => res.json())
       .then(resData => { setData(Array.isArray(resData) ? resData : []); setLoading(false); })
       .catch(() => { setData([]); setLoading(false); });
@@ -188,7 +188,7 @@ export const GLDaybookChart = ({ selectedBranch = 'ALL' }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/gl-daybook-summary?branch_code=${selectedBranch}`)
+    fetch(`http://127.0.0.1:8000/api/gl-daybook-summary?branch_code=${selectedBranch}`)
       .then(res => res.json())
       .then(resData => { setData(Array.isArray(resData) ? resData : []); setLoading(false); })
       .catch(() => { setData([]); setLoading(false); });
@@ -221,7 +221,7 @@ export const LeastTransactionsChart = ({ selectedBranch = 'ALL' }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/least-transactions?branch_code=${selectedBranch}`)
+    fetch(`http://127.0.0.1:8000/api/least-transactions?branch_code=${selectedBranch}`)
       .then(res => res.json())
       .then(resData => { setData(Array.isArray(resData) ? resData : []); setLoading(false); })
       .catch(() => { setData([]); setLoading(false); });
@@ -256,7 +256,7 @@ export const BranchComparisonChart = () => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/branch-comparison`)
+    fetch(`http://127.0.0.1:8000/api/branch-comparison`)
       .then(res => res.json())
       .then(resData => { setData(Array.isArray(resData) ? resData : []); setLoading(false); })
       .catch(() => { setData([]); setLoading(false); });
@@ -283,3 +283,4 @@ export const BranchComparisonChart = () => {
     </div>
   );
 };
+
