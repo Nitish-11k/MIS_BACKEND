@@ -173,7 +173,7 @@ const DynamicDataGrid = ({
           result.columns.map((column) => ({
             key: column,
             name: column.replace(/_/g, ' '),
-            selector: (row) => row[column],
+            selector: (row) => (row && row[column] !== undefined && row[column] !== null ? String(row[column]) : ''),
             sortable: true,
             wrap: true,
             minWidth: '150px',
@@ -712,8 +712,6 @@ const DynamicDataGrid = ({
           customStyles={customStyles}
           responsive
           highlightOnHover
-          fixedHeader
-          fixedHeaderScrollHeight="100%"
           noDataComponent={
             <div
               style={{

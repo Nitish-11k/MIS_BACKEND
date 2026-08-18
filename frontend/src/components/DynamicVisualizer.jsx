@@ -62,11 +62,12 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
       .then(res => res.json())
       .then(result => {
         if (result && result.length > 0) {
-          const metricKeys = Object.keys(result[0]).filter(k => k !== 'BRANCH_CODE');
+          const metricKeys = Object.keys(result[0]).filter(k => k !== 'BRANCH_CODE' && k !== 'BRANCH_NAME');
           setMetrics(metricKeys);
           
           const formattedData = result.map(row => {
-            const newRow = { name: `Branch ${row.BRANCH_CODE}`, branchCode: row.BRANCH_CODE };
+            const branchLabel = row.BRANCH_NAME ? row.BRANCH_NAME.trim() : `Branch ${row.BRANCH_CODE}`;
+            const newRow = { name: branchLabel, branchCode: row.BRANCH_CODE };
             metricKeys.forEach(k => {
               newRow[k] = row[k] || 0;
             });
@@ -84,14 +85,17 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
   }, [tableName, branchCode, period, exactDate]);
 
   const handleChartClick = (entry) => {
-    // entry can be a pie slice, bar segment, or line dot
-    // Try to extract branchCode
-    if (entry && entry.branchCode) {
-      setDrillDownBranch(entry.branchCode);
-    } else if (entry && entry.payload && entry.payload.branchCode) {
-      setDrillDownBranch(entry.payload.branchCode);
-    } else if (entry && entry.activePayload && entry.activePayload.length > 0) {
-      setDrillDownBranch(entry.activePayload[0].payload.branchCode);
+    let bCode = null;
+    if (entry && typeof entry.branchCode === 'string') {
+      bCode = entry.branchCode;
+    } else if (entry && entry.payload && typeof entry.payload.branchCode === 'string') {
+      bCode = entry.payload.branchCode;
+    } else if (entry && entry.activePayload && entry.activePayload.length > 0 && entry.activePayload[0]?.payload?.branchCode) {
+      bCode = entry.activePayload[0].payload.branchCode;
+    }
+    
+    if (bCode && typeof bCode === 'string' && bCode !== 'ALL') {
+      setDrillDownBranch(bCode);
     }
   };
 
@@ -155,23 +159,27 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
             <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
               Top Distribution ({getReadableName(primaryMetric)})
             </div>
-            <div style={{ flex: 1, position: 'relative' }}>
+            <div style={{ height: '260px', width: '100%', position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={donutData}
-                    innerRadius="60%"
-                    outerRadius="80%"
+                    innerRadius={60}
+                    outerRadius={90}
                     paddingAngle={2}
                     dataKey="_abs_val" // Use absolute value for rendering pie proportions
-                    onClick={(entry) => entry.branchCode !== 'ALL' && handleChartClick(entry)}
+                    onClick={(entry) => entry && entry.branchCode && entry.branchCode !== 'ALL' && handleChartClick(entry)}
                     style={{ cursor: 'pointer' }}
                   >
                     {donutData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name, props) => [formatAmount(props.payload[primaryMetric]), props.payload.name]} />
+                  <Tooltip formatter={(value, name, props) => {
+                    const val = props && props.payload && primaryMetric ? props.payload[primaryMetric] : value;
+                    const pName = props && props.payload && props.payload.name ? props.payload.name : name;
+                    return [formatAmount(val), pName];
+                  }} />
                   <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -183,7 +191,7 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
             <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
               Trend Analysis ({getReadableName(secondaryMetric)})
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ height: '260px', width: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }} onClick={handleChartClick}>
                   <defs>
@@ -196,40 +204,72 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={formatAmount} tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
                   <Tooltip formatter={(value) => [formatAmount(value), getReadableName(secondaryMetric)]} cursor={{ stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '5 5' }} />
-                  <Area type="monotone" dataKey={secondaryMetric} stroke={COLORS[1]} fillOpacity={1} fill="url(#colorMetric)" style={{ cursor: 'pointer' }} />
+                  {secondaryMetric ? (
+                    <Area type="monotone" dataKey={secondaryMetric} stroke={COLORS[1]} fillOpacity={1} fill="url(#colorMetric)" style={{ cursor: 'pointer' }} />
+                  ) : null}
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        {/* BOTTOM ROW: Full Bar Chart */}
-        <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '20px', flex: 1, minHeight: '350px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111827' }}>
-              Comprehensive Analysis (All Metrics)
+        {/* BOTTOM ROW: Clean Loan Visual Chart (Replaces text grid with high-impact loan metrics visual) */}
+        <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '24px', flex: 1, minHeight: '380px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: '#0F172A' }}>
+                {title} - Top Branch Comparison
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                Visual breakdown of key loan metrics across top performing branches
+              </div>
             </div>
-            <div style={{ fontSize: '12px', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Maximize2 size={14} /> Click any bar for raw data
-            </div>
+            {primaryMetric && (
+              <div style={{ fontSize: '12px', padding: '4px 12px', background: '#F1F5F9', borderRadius: '20px', fontWeight: '600', color: '#475569' }}>
+                Primary: {getReadableName(primaryMetric)}
+              </div>
+            )}
           </div>
           
-          <div style={{ flex: 1 }}>
+          <div style={{ height: '300px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} onClick={handleChartClick}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={formatAmount} tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value, name) => [formatAmount(value), getReadableName(name)]} cursor={{ fill: '#F9FAFB' }} />
-                <Legend formatter={(value) => getReadableName(value)} wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+              <BarChart 
+                data={data.slice(0, 10)} 
+                margin={{ top: 10, right: 30, left: 10, bottom: 25 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fontSize: 10, fill: '#334155', fontWeight: '600' }} 
+                  axisLine={{ stroke: '#CBD5E1' }} 
+                  tickLine={false} 
+                  interval={0}
+                  angle={-25}
+                  textAnchor="end"
+                  height={45}
+                />
+                <YAxis 
+                  tickFormatter={formatAmount} 
+                  tick={{ fontSize: 11, fill: '#64748B' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                />
+                <Tooltip 
+                  formatter={(value, name) => [formatAmount(value), getReadableName(name)]} 
+                  cursor={{ fill: '#F8FAFC' }} 
+                />
+                <Legend 
+                  formatter={(value) => getReadableName(value)} 
+                  wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} 
+                />
                 
-                {metrics.map((metric, idx) => (
+                {(balanceMetrics.length > 0 ? balanceMetrics.slice(0, 2) : metrics.slice(0, 2)).map((metric, idx) => (
                   <Bar 
                     key={metric} 
                     dataKey={metric} 
-                    fill={COLORS[idx % COLORS.length]} 
+                    fill={COLORS[(idx * 2) % COLORS.length]} 
                     radius={[4, 4, 0, 0]}
-                    style={{ cursor: 'pointer' }}
+                    barSize={28}
                   />
                 ))}
               </BarChart>

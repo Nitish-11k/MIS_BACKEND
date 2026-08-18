@@ -2236,7 +2236,11 @@ def get_visualize_data(table_name: str, branch_code: str = "ALL", period: str = 
     
     # If a specific branch is selected, maybe group by PROC_DATE? No, stick to BRANCH_CODE for consistency, or group by both.
     # The UI DynamicVisualizer maps branchCode to 'name'. We will group by BRANCH_CODE.
-    query = f"SELECT BRANCH_CODE, {sum_selects} FROM [{table_name.upper()}] {where_clause} GROUP BY BRANCH_CODE"
+    has_branch_name = 'BRANCH_NAME' in [c.upper() for c in columns]
+    if has_branch_name:
+        query = f"SELECT BRANCH_CODE, MAX(BRANCH_NAME) as BRANCH_NAME, {sum_selects} FROM [{table_name.upper()}] {where_clause} GROUP BY BRANCH_CODE"
+    else:
+        query = f"SELECT BRANCH_CODE, {sum_selects} FROM [{table_name.upper()}] {where_clause} GROUP BY BRANCH_CODE"
     
     cursor.execute(query, params)
     
@@ -2264,11 +2268,11 @@ def npa_summary(branch_code: Optional[str] = None, period: str = "ALL", start_da
         
         query = f"""
             SELECT 
-                ASSET_CLASSIFICATION as category,
-                SUM(OUTSTANDING_BALANCE) as amount
+                PROD_DESCRIPTION as category,
+                SUM(BAL_OUTSTAND) as amount
             FROM NPA_STMT
             WHERE 1=1 {branch_filter} {date_filter}
-            GROUP BY ASSET_CLASSIFICATION
+            GROUP BY PROD_DESCRIPTION
         """
         
         cursor.execute(query, filter_params + date_params)
@@ -2306,7 +2310,7 @@ def audit_exceptions(branch_code: Optional[str] = None, period: str = "ALL", sta
             
         # Combining data from BGL Audit and High Value Txns as proxy for exceptions
         bgl_query = f"""
-            SELECT COUNT(*) as count FROM AUDIT_BGL_ACCOUNTS_AGE_WISE_BREAK_UP {branch_filter}
+            SELECT COUNT(*) as count FROM AUDIT_BGL_ACCOUNTS_AGE_WISE_BREAK_UP_GEND0805 {branch_filter}
         """
         cursor.execute(bgl_query, filter_params)
         bgl_count = cursor.fetchone()[0] or 0
@@ -2383,11 +2387,37 @@ async def get_loans_dashboard(branch_code: str = "ALL", period: str = "all_time"
         cursor.execute(query_prod, params_glcc)
         products = [{"name": row[0], "value": float(row[1] or 0)} for row in cursor.fetchall() if row[0] and row[1]]
 
-        # 5. Branch-wise aggregate
+        # 5. Branch-wise aggregate (Loans)
         query_branch = "SELECT BRANCH_NAME, SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) as sum_amt FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM " + where_glcc + " GROUP BY BRANCH_NAME ORDER BY sum_amt DESC"
         cursor.execute(query_branch, params_glcc)
         branches = [{"name": row[0], "value": float(row[1] or 0)} for row in cursor.fetchall() if row[0] and row[1]]
         
+        # 6. Branch-wise aggregate (NPA)
+        query_branch_npa = """
+            SELECT 
+                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = LIST_OF_NPA_ACCOUNTS.BRANCH_CODE), LIST_OF_NPA_ACCOUNTS.BRANCH_CODE) as BRANCH_NAME,
+                SUM(TRY_CAST(REPLACE(ISNULL(OUTSTANDING, '0'), ',', '') AS FLOAT)) as sum_amt
+            FROM LIST_OF_NPA_ACCOUNTS
+            """ + where_npa + """
+            GROUP BY LIST_OF_NPA_ACCOUNTS.BRANCH_CODE
+            ORDER BY sum_amt DESC
+        """
+        cursor.execute(query_branch_npa, params_npa)
+        branch_npa = [{"name": row[0] if row[0] else "Unknown", "value": float(row[1] or 0)} for row in cursor.fetchall() if row[1]]
+        
+        # 7. Branch-wise aggregate (Irregular)
+        query_branch_irreg = """
+            SELECT 
+                COALESCE(BRANCH_NAME, BRANCH_CODE) as BRANCH_NAME,
+                SUM(TRY_CAST(REPLACE(ISNULL(IRREGULARITY, '0'), ',', '') AS FLOAT)) as sum_amt
+            FROM LOAN_IRREGULAR_REPORT
+            """ + where_irreg + """
+            GROUP BY BRANCH_NAME, BRANCH_CODE
+            ORDER BY sum_amt DESC
+        """
+        cursor.execute(query_branch_irreg, params_irreg)
+        branch_irregular = [{"name": row[0] if row[0] else "Unknown", "value": float(row[1] or 0)} for row in cursor.fetchall() if row[1]]
+
         conn.close()
         
         return {
@@ -2397,10 +2427,82 @@ async def get_loans_dashboard(branch_code: str = "ALL", period: str = "all_time"
                 "total_irregular": float(total_irreg)
             },
             "products": products,
-            "branches": branches
+            "branches": branches,
+            "branch_npa": branch_npa,
+            "branch_irregular": branch_irregular
         }
     except Exception as e:
         print("Error in /api/loans-dashboard:", str(e))
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e), "overview": {}, "products": [], "branches": [], "branch_npa": [], "branch_irregular": []}
+
+@app.get("/api/deposits-dashboard")
+def get_deposits_dashboard(branch_code: str = "ALL", period: str = "30D", start_date: str = None, end_date: str = None):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        where_clause = ""
+        params = []
+        if branch_code and branch_code != "ALL":
+            where_clause = " WHERE BRANCH_CODE = ? "
+            params.append(branch_code)
+
+        # 1. Overview KPIs
+        query_overview = f"""
+            SELECT 
+                SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as total_dep,
+                SUM(CASE WHEN ACCOUNT_TYPE LIKE 'SB%' OR ACCOUNT_TYPE LIKE 'CA%' OR ACCOUNT_TYPE LIKE 'CURRENT%' THEN TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT) ELSE 0 END) as casa_dep,
+                SUM(CASE WHEN ACCOUNT_TYPE LIKE '%TDR%' OR ACCOUNT_TYPE LIKE 'RD%' OR ACCOUNT_TYPE LIKE '%FDR%' THEN TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT) ELSE 0 END) as term_dep
+            FROM DEPOSITS_BALANCE_FILE_DEPD0586
+            {where_clause}
+        """
+        cursor.execute(query_overview, params)
+        row = cursor.fetchone()
+        total_dep = row[0] or 0
+        casa_dep = row[1] or 0
+        term_dep = row[2] or 0
+
+        # 2. Product Distribution
+        query_products = f"""
+            SELECT 
+                ISNULL(ACCOUNT_TYPE, 'Other') as name,
+                SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as value
+            FROM DEPOSITS_BALANCE_FILE_DEPD0586
+            {where_clause}
+            GROUP BY ACCOUNT_TYPE
+            ORDER BY value DESC
+        """
+        cursor.execute(query_products, params)
+        products = [{"name": r[0], "value": float(r[1] or 0)} for r in cursor.fetchall() if r[1]]
+
+        # 3. Branch Distribution
+        query_branches = f"""
+            SELECT 
+                COALESCE(BRANCH_NAME, BRANCH_CODE) as BRANCH_NAME,
+                SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as value
+            FROM DEPOSITS_BALANCE_FILE_DEPD0586
+            {where_clause}
+            GROUP BY BRANCH_NAME, BRANCH_CODE
+            ORDER BY value DESC
+        """
+        cursor.execute(query_branches, params)
+        branches = [{"name": r[0] if r[0] else "Unknown", "value": float(r[1] or 0)} for r in cursor.fetchall() if r[1]]
+
+        conn.close()
+
+        return {
+            "overview": {
+                "total_deposits": float(total_dep),
+                "casa_deposits": float(casa_dep),
+                "term_deposits": float(term_dep)
+            },
+            "products": products,
+            "branches": branches
+        }
+    except Exception as e:
+        print("Error in /api/deposits-dashboard:", str(e))
+        import traceback
         traceback.print_exc()
         return {"error": str(e), "overview": {}, "products": [], "branches": []}
-
