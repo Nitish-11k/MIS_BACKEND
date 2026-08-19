@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Building2, Store, Search, MapPin, Building } from 'lucide-react';
 
-const BranchNetworkTab = () => {
+const BranchNetworkTab = ({ apiBranchCode }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedRegions, setExpandedRegions] = useState({});
@@ -9,7 +9,7 @@ const BranchNetworkTab = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/branch-network')
+    fetch(`http://127.0.0.1:8000/api/branch-network?branch_code=${apiBranchCode || 'ALL'}`)
       .then(res => res.json())
       .then(fetchedData => {
         setData(fetchedData);
@@ -21,7 +21,7 @@ const BranchNetworkTab = () => {
         console.error("Error fetching branch network", err);
         setLoading(false);
       });
-  }, []);
+  }, [apiBranchCode]);
 
   const toggleRegion = (region) => {
     setExpandedRegions(prev => ({

@@ -14,11 +14,15 @@ import UploadTab from './UploadTab';
 import BranchNetworkTab from './BranchNetworkTab';
 
 const Dashboard = ({ user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState('overview');
+
+        const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   // Real data state
   const [branches, setBranches] = useState([]);
+  const [allBranches, setAllBranches] = useState([]);
+  const [regions, setRegions] = useState([]);
+  const [selectedRegion, setSelectedRegion] = useState(user?.role === 'RO' ? user.region : 'ALL');
   const [selectedBranch, setSelectedBranch] = useState(user?.role === 'BRANCH' ? user.branch : 'ALL');
   const [selectedPeriod, setSelectedPeriod] = useState('30D');
   const [selectedProduct, setSelectedProduct] = useState('All Products');
@@ -46,23 +50,50 @@ const Dashboard = ({ user, onLogout }) => {
   }, []);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/branches')
-      .then(res => res.json())
-      .then(data => { 
-        if (Array.isArray(data)) {
-          if (user?.role === 'RO') {
-            setBranches(data.filter(b => b.region === user.region));
-          } else if (user?.role === 'BRANCH') {
-            setBranches(data.filter(b => b.code === user.branch));
-          } else {
-            setBranches(data);
-          }
+    Promise.all([
+      fetch('http://127.0.0.1:8000/api/branches').then(res => res.json()),
+      fetch('http://127.0.0.1:8000/api/regions').then(res => res.json())
+    ]).then(([branchesData, regionsData]) => {
+      if (regionsData?.success) {
+        if (user?.role === 'RO') {
+          setRegions([user.region]);
+        } else if (user?.role === 'BRANCH') {
+          setRegions([]);
         } else {
-          setBranches([]);
+          setRegions(regionsData.regions);
         }
-      })
-      .catch(console.error);
-  }, []);
+      }
+      
+      if (Array.isArray(branchesData)) {
+        setAllBranches(branchesData);
+        if (user?.role === 'RO') {
+          setBranches(branchesData.filter(b => b.region === user.region));
+        } else if (user?.role === 'BRANCH') {
+          setBranches(branchesData.filter(b => b.code === user.branch));
+        } else {
+          setBranches(branchesData);
+        }
+      }
+    }).catch(console.error);
+  }, [user]);
+
+  // When region changes, update branches
+  useEffect(() => {
+    if (user?.role === 'HO') {
+      if (selectedRegion === 'ALL') {
+        setBranches(allBranches);
+      } else {
+        setBranches(allBranches.filter(b => b.region === selectedRegion));
+        if (selectedBranch !== 'ALL' && !allBranches.some(b => b.region === selectedRegion && b.code === selectedBranch)) {
+           setSelectedBranch('ALL');
+        }
+      }
+    }
+  }, [selectedRegion, allBranches]);
+  
+  // Computed branch code for API calls
+  const apiBranchCode = (selectedBranch === 'ALL' && selectedRegion !== 'ALL') ? 'REGION:' + selectedRegion : selectedBranch;
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -79,15 +110,15 @@ const Dashboard = ({ user, onLogout }) => {
           kpiRes, accountRes, branchNpaRes,
           prodData, pieRes, trendDataRes, npaSummaryRes, auditRes, npaTrendRes
         ] = await Promise.all([
-          fetch(`http://127.0.0.1:8000/api/kpi-summary?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/account-metrics?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/npa-branch-wise?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/productwise-summary?branch_code=${selectedBranch}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/deposits-by-type?branch_code=${selectedBranch}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/trend-data?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
-          fetch(`http://127.0.0.1:8000/api/npa-summary?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => []),
-          fetch(`http://127.0.0.1:8000/api/audit-exceptions?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => []),
-          fetch(`http://127.0.0.1:8000/api/npa-trend?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => [])
+          fetch(`http://127.0.0.1:8000/api/kpi-summary?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/account-metrics?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/npa-branch-wise?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/productwise-summary?branch_code=${apiBranchCode}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/deposits-by-type?branch_code=${apiBranchCode}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/trend-data?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/npa-summary?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()).catch(() => []),
+          fetch(`http://127.0.0.1:8000/api/audit-exceptions?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()).catch(() => []),
+          fetch(`http://127.0.0.1:8000/api/npa-trend?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()).catch(() => [])
         ]);
 
         setKpiData(kpiRes || {});
@@ -107,7 +138,7 @@ const Dashboard = ({ user, onLogout }) => {
     };
 
     fetchData();
-  }, [selectedBranch, selectedPeriod, startDate, endDate]);
+  }, [apiBranchCode, selectedPeriod, startDate, endDate]);
 
   return (
     <div className="app-container" style={{ display: 'flex', height: '100vh', backgroundColor: '#F3F4F6', fontFamily: 'Inter, sans-serif', overflowX: 'hidden', position: 'relative' }}>
@@ -125,8 +156,8 @@ const Dashboard = ({ user, onLogout }) => {
             { id: 'compliance', label: 'Audit & Exceptions', icon: FileSignature },
             { id: 'reports', label: 'Reports & Accounts', icon: FileText },
             { id: 'upload', label: 'Data Sync', icon: UploadCloud },
-            { id: 'profile', label: 'My Profile', icon: User },
             ...(user?.role === 'HO' ? [{ id: 'users', label: 'User Management', icon: UserPlus }] : []),
+            { id: 'profile', label: 'My Profile', icon: User },
             { id: 'settings', label: 'Settings', icon: Settings },
           ].map(item => (
             <div 
@@ -157,26 +188,7 @@ const Dashboard = ({ user, onLogout }) => {
           ))}
         </div>
 
-        <div 
-          onClick={() => setActiveTab('profile')}
-          style={{ padding: isSidebarOpen ? '20px' : '20px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'flex-start' : 'center', gap: '12px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-        >
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-            {user?.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
-          </div>
-          {isSidebarOpen && (
-            <div style={{ flex: 1 }}>
-              <div style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }} title={user?.name}>{user?.name || 'User'}</div>
-              <div style={{ color: '#9CA3AF', fontSize: '11px', marginTop: '2px' }}>{user?.role === 'HO' ? 'Head Office' : user?.role === 'RO' ? 'Regional Office' : 'Branch'}</div>
-              <div style={{ color: '#10B981', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', cursor: 'pointer' }} onClick={onLogout}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EF4444' }}></div>
-                <span style={{ color: '#EF4444' }}>Logout</span>
-              </div>
-            </div>
-          )}
-        </div>
+        
         
         {/* Collapse Button */}
         <div 
@@ -198,12 +210,13 @@ const Dashboard = ({ user, onLogout }) => {
       )}
       <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
-        <FilterBar 
+        <FilterBar regions={regions} selectedRegion={selectedRegion} setSelectedRegion={setSelectedRegion} 
           isMobile={isMobile}
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
           branches={branches}
-          selectedBranch={selectedBranch}
+          allBranches={allBranches}
+          selectedBranch={apiBranchCode}
           setSelectedBranch={setSelectedBranch}
           selectedPeriod={selectedPeriod}
           setSelectedPeriod={setSelectedPeriod}
@@ -235,11 +248,11 @@ const Dashboard = ({ user, onLogout }) => {
             />
           )}
           
-          {activeTab === 'network' && <BranchNetworkTab />}
-          {activeTab === 'loans' && <LoanPortfolioTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
-          {activeTab === 'deposits' && <DepositsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
-          {activeTab === 'compliance' && <ComplianceTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
-          {activeTab === 'reports' && <ReportsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
+          {activeTab === 'network' && <BranchNetworkTab apiBranchCode={apiBranchCode} />}
+          {activeTab === 'loans' && <LoanPortfolioTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
+          {activeTab === 'deposits' && <DepositsTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
+          {activeTab === 'compliance' && <ComplianceTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
+          {activeTab === 'reports' && <ReportsTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
           {activeTab === 'upload' && <UploadTab />}
           {activeTab === 'profile' && <ProfileTab user={user} onLogout={onLogout} />}
           {activeTab === 'users' && user?.role === 'HO' && <UserManagementTab user={user} />}
@@ -252,7 +265,7 @@ const Dashboard = ({ user, onLogout }) => {
         <SmartModal 
           activeModal={activeModal} 
           onClose={() => setActiveModal(null)} 
-          branchCode={selectedBranch} 
+          branchCode={apiBranchCode} 
           startDate={startDate}
           endDate={endDate}
           period={selectedPeriod}

@@ -539,7 +539,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
                 color: '#64748B',
               }}
             >
-              Branch: {branchCode === 'ALL' ? 'All Branches' : branchCode}
+              Branch: {branchCode === 'ALL' ? 'All Branches' : branchCode.startsWith('REGION:') ? `All Branches in ${branchCode.replace('REGION:', '')}` : branchCode}
               {' • '}
               Period: {period || 'ALL'}
             </div>

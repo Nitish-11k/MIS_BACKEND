@@ -6,6 +6,10 @@ const FilterBar = ({
   isSidebarOpen,
   setIsSidebarOpen,
   branches,
+  allBranches,
+  regions,
+  selectedRegion,
+  setSelectedRegion,
   selectedBranch,
   setSelectedBranch,
   selectedPeriod,
@@ -24,12 +28,21 @@ const FilterBar = ({
   
   // Local states for filters to apply on click
   const [localPeriod, setLocalPeriod] = useState(selectedPeriod);
+  const [localRegion, setLocalRegion] = useState(selectedRegion || 'ALL');
   const [localBranch, setLocalBranch] = useState(selectedBranch);
   const [localStartDate, setLocalStartDate] = useState(startDate || '');
   const [localEndDate, setLocalEndDate] = useState(endDate || '');
   const [localProduct, setLocalProduct] = useState(selectedProduct || 'All Products');
   const [status, setStatus] = useState('All');
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
+
+  // Dynamically filter branches based on localRegion before applying
+  const displayBranches = React.useMemo(() => {
+    if (!allBranches || allBranches.length === 0) return branches;
+    if (localRegion === 'ALL') return allBranches;
+    return allBranches.filter(b => b.region === localRegion);
+  }, [allBranches, branches, localRegion]);
+
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -46,6 +59,7 @@ const FilterBar = ({
 
   const handleApplyFilters = () => {
     setSelectedPeriod(localPeriod);
+    if (setSelectedRegion) setSelectedRegion(localRegion);
     setSelectedBranch(localBranch);
     setStartDate(localStartDate);
     setEndDate(localEndDate);
@@ -59,8 +73,12 @@ const FilterBar = ({
     setStartDate('');
     setLocalEndDate('');
     setEndDate('');
-    setLocalBranch('ALL');
-    setSelectedBranch('ALL');
+    if (user?.role === 'HO') {
+      setLocalRegion('ALL');
+      if (setSelectedRegion) setSelectedRegion('ALL');
+    }
+    setLocalBranch(user?.role === 'BRANCH' ? user.branch : 'ALL');
+    setSelectedBranch(user?.role === 'BRANCH' ? user.branch : 'ALL');
     setLocalProduct('All Products');
     if (setSelectedProduct) setSelectedProduct('All Products');
     setStatus('All');
@@ -189,7 +207,30 @@ const FilterBar = ({
           </div>
         </div>
 
+        
+        {/* Region Dropdown */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '11px', fontWeight: '600', color: '#0F172A' }}>Region</label>
+          <div style={{ display: 'flex', alignItems: 'center', background: '#FFFFFF', border: '1px solid #E2E8F0', padding: '8px 12px', borderRadius: '6px' }}>
+            <select 
+              value={localRegion} 
+              onChange={(e) => {
+                setLocalRegion(e.target.value);
+                setLocalBranch('ALL'); // Reset branch when region changes
+              }}
+              disabled={user?.role !== 'HO'}
+              style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', minWidth: '140px', cursor: user?.role !== 'HO' ? 'not-allowed' : 'pointer', opacity: user?.role !== 'HO' ? 0.7 : 1 }}
+            >
+              {user?.role === 'HO' && <option value="ALL">All Regions</option>}
+              {(regions || []).map((r, i) => (
+                <option key={i} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {/* Branch Dropdown */}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: '#0F172A' }}>Branch</label>
           <div style={{ display: 'flex', alignItems: 'center', background: '#FFFFFF', border: '1px solid #E2E8F0', padding: '8px 12px', borderRadius: '6px' }}>
@@ -200,7 +241,7 @@ const FilterBar = ({
               style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', minWidth: '140px', cursor: user?.role === 'BRANCH' ? 'not-allowed' : 'pointer', opacity: user?.role === 'BRANCH' ? 0.7 : 1 }}
             >
               {user?.role !== 'BRANCH' && <option value="ALL">All Branches</option>}
-              {branches.map((b, i) => (
+              {displayBranches.map((b, i) => (
                 <option key={i} value={b.code}>{b.code} - {b.name}</option>
               ))}
             </select>

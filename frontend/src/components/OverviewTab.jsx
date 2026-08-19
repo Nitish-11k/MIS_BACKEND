@@ -41,12 +41,12 @@ const OverviewTab = ({
       
       {/* KPI ROW */}
       <div className="overview-kpi-grid">
-        <KPICard title="TOTAL ACCOUNTS" value={accountMetrics?.total || 0} isCurrency={false} changePercent="7.2" changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('total')} />
-        <KPICard title="TOTAL DEPOSITS" value={kpiData?.total_deposits || 0} isCurrency={true} changePercent="8.3" changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('deposits')} />
-        <KPICard title="TOTAL LOANS" value={kpiData?.total_loans || 0} isCurrency={true} changePercent="6.1" changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('loans')} />
-        <KPICard title="TOTAL NPA" value={kpiData?.total_npa || 0} isCurrency={true} changePercent="12.6" changeType="negative" periodLabel={selectedPeriod} onClick={() => setActiveModal('npa')} />
-        <KPICard title="OPENED ACCOUNTS" value={accountMetrics?.opened || 0} isCurrency={false} changePercent="5.4" changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('opened')} />
-        <KPICard title="CLOSED ACCOUNTS" value={accountMetrics?.closed || 0} isCurrency={false} changePercent="3.7" changeType="negative" periodLabel={selectedPeriod} onClick={() => setActiveModal('closed')} />
+        <KPICard title="TOTAL ACCOUNTS" value={accountMetrics?.total || 0} isCurrency={false} changePercent={accountMetrics?.total ? "7.2" : "0"} changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('total')} />
+        <KPICard title="TOTAL DEPOSITS" value={kpiData?.total_deposits || 0} isCurrency={true} changePercent={kpiData?.total_deposits ? "8.3" : "0"} changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('deposits')} />
+        <KPICard title="TOTAL LOANS" value={kpiData?.total_loans || 0} isCurrency={true} changePercent={kpiData?.total_loans ? "6.1" : "0"} changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('loans')} />
+        <KPICard title="TOTAL NPA" value={kpiData?.total_npa || 0} isCurrency={true} changePercent={kpiData?.total_npa ? "12.6" : "0"} changeType="negative" periodLabel={selectedPeriod} onClick={() => setActiveModal('npa')} />
+        <KPICard title="OPENED ACCOUNTS" value={accountMetrics?.opened || 0} isCurrency={false} changePercent={accountMetrics?.opened ? "5.4" : "0"} changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('opened')} />
+        <KPICard title="CLOSED ACCOUNTS" value={accountMetrics?.closed || 0} isCurrency={false} changePercent={accountMetrics?.closed ? "3.7" : "0"} changeType="negative" periodLabel={selectedPeriod} onClick={() => setActiveModal('closed')} />
       </div>
 
       {/* MIDDLE ROW (3 Charts) */}

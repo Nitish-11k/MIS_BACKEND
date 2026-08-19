@@ -12,6 +12,7 @@ const UserManagementTab = ({ user }) => {
   const [role, setRole] = useState('BRANCH');
   const [region, setRegion] = useState('');
   const [branch, setBranch] = useState('');
+  const [availableRegions, setAvailableRegions] = useState([]);
   
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
 
@@ -32,6 +33,21 @@ const UserManagementTab = ({ user }) => {
 
   useEffect(() => {
     fetchUsers();
+    
+    // Fetch regions for the dropdown
+    const fetchRegions = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/regions');
+        const data = await response.json();
+        if (data.success) {
+          setAvailableRegions(data.regions);
+          if (data.regions.length > 0) setRegion(data.regions[0]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch regions", err);
+      }
+    };
+    fetchRegions();
   }, []);
 
   const handleCreateUser = async (e) => {
@@ -142,7 +158,12 @@ const UserManagementTab = ({ user }) => {
             {role === 'RO' && (
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B', marginBottom: '6px' }}>Assigned Region Name</label>
-                <input value={region} onChange={e => setRegion(e.target.value)} type="text" placeholder="e.g. DELHI" style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '14px', outline: 'none' }} />
+                <select value={region} onChange={e => setRegion(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '14px', outline: 'none', background: '#FFFFFF' }}>
+                  {availableRegions.length === 0 && <option value="">Loading Regions...</option>}
+                  {availableRegions.map((r, i) => (
+                    <option key={i} value={r}>{r}</option>
+                  ))}
+                </select>
               </div>
             )}
 
