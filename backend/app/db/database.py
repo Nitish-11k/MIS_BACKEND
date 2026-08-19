@@ -10,6 +10,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set in .env")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, fast_executemany=True)
 
 SessionLocal = sessionmaker(bind=engine)

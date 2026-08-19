@@ -1,0 +1,1096 @@
+{
+  "BRANCH_NETWORK": [
+    {
+      "name": "ID",
+      "type": "int"
+    },
+    {
+      "name": "HEAD_OFFICE",
+      "type": "varchar"
+    },
+    {
+      "name": "REGIONAL_OFFICE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "DISTRICT",
+      "type": "varchar"
+    },
+    {
+      "name": "ADDRESS",
+      "type": "text"
+    },
+    {
+      "name": "CONTACT_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    }
+  ],
+  "ACCOUNT_OPENED_REPORT": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "SR_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NUMBER",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PRODUCT",
+      "type": "varchar"
+    },
+    {
+      "name": "PRODUCT_DESCRIPTION",
+      "type": "varchar"
+    },
+    {
+      "name": "INT_RATE",
+      "type": "varchar"
+    },
+    {
+      "name": "BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "OPENED_DATE",
+      "type": "varchar"
+    },
+    {
+      "name": "SYS",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "LIST_OF_NPA_ACCOUNTS": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "SR_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "BR_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACT",
+      "type": "varchar"
+    },
+    {
+      "name": "CAT",
+      "type": "varchar"
+    },
+    {
+      "name": "DESCRIPT",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCT_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "CUST_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "CUST_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "MOB_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "INCA",
+      "type": "varchar"
+    },
+    {
+      "name": "UIPY",
+      "type": "varchar"
+    },
+    {
+      "name": "OI",
+      "type": "varchar"
+    },
+    {
+      "name": "NI",
+      "type": "varchar"
+    },
+    {
+      "name": "NPA_DATE",
+      "type": "varchar"
+    },
+    {
+      "name": "OUTSTANDING",
+      "type": "varchar"
+    },
+    {
+      "name": "INSTALLMENT_AMT",
+      "type": "varchar"
+    },
+    {
+      "name": "EMIS_OVERDUE",
+      "type": "varchar"
+    },
+    {
+      "name": "SYS",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "BAL_IN_LOAN_ACC_GLCC_WISE_DET": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "SLNO",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT",
+      "type": "varchar"
+    },
+    {
+      "name": "NAME_OF_ACCOUNT",
+      "type": "varchar"
+    },
+    {
+      "name": "DR_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "CR_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "INT_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "INT_RATE",
+      "type": "varchar"
+    },
+    {
+      "name": "INT_YTD_CY",
+      "type": "varchar"
+    },
+    {
+      "name": "INT_YTD_PY",
+      "type": "varchar"
+    },
+    {
+      "name": "UNPD_INT",
+      "type": "varchar"
+    },
+    {
+      "name": "GL_CLASS_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "PRODUCT_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "LOANSBALANCEFILE_LOND2390": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "ACCOUNT_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "LIMIT",
+      "type": "varchar"
+    },
+    {
+      "name": "INT_RATE",
+      "type": "varchar"
+    },
+    {
+      "name": "THEO_BAL",
+      "type": "varchar"
+    },
+    {
+      "name": "OUTSTANDING",
+      "type": "varchar"
+    },
+    {
+      "name": "IRREGULARITY",
+      "type": "varchar"
+    },
+    {
+      "name": "SANCTION_DATE",
+      "type": "varchar"
+    },
+    {
+      "name": "EMIS_DUE",
+      "type": "varchar"
+    },
+    {
+      "name": "EMIS_PAID",
+      "type": "varchar"
+    },
+    {
+      "name": "EMIS_OVERDUE",
+      "type": "varchar"
+    },
+    {
+      "name": "NEW_IRAC",
+      "type": "varchar"
+    },
+    {
+      "name": "OLD_IRAC",
+      "type": "varchar"
+    },
+    {
+      "name": "ADV_PAID_AMT",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREAR_COND",
+      "type": "varchar"
+    },
+    {
+      "name": "CURRENCY",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCT_MTAIN_BRCH",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_TYPE",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "CC_OD_BALANCE_FILE_DEPD0580": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "ACCOUNT_NUM",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_TYP_DESC",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "RATE",
+      "type": "varchar"
+    },
+    {
+      "name": "LIMIT",
+      "type": "varchar"
+    },
+    {
+      "name": "DRAWING_POWER",
+      "type": "varchar"
+    },
+    {
+      "name": "LMT_EXPY_DT",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "UNCLEARED_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "IRREGULARITY",
+      "type": "varchar"
+    },
+    {
+      "name": "NEW",
+      "type": "varchar"
+    },
+    {
+      "name": "OLD",
+      "type": "varchar"
+    },
+    {
+      "name": "SANCTION_DT",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREAR_COND",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCT_MAINTAIN_BRANCH",
+      "type": "varchar"
+    },
+    {
+      "name": "STATUS",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "DRAWING_POWER_LOND2388": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "SL_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "COLLATERAL_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "BENCHMARK_LEVEL",
+      "type": "varchar"
+    },
+    {
+      "name": "TOLERANCE_LEVEL",
+      "type": "varchar"
+    },
+    {
+      "name": "ACTUAL_VARIANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "SYSTEM",
+      "type": "varchar"
+    },
+    {
+      "name": "OUTSTANDING",
+      "type": "varchar"
+    },
+    {
+      "name": "DRAWING_POWER",
+      "type": "varchar"
+    },
+    {
+      "name": "IRREGULARITY",
+      "type": "varchar"
+    },
+    {
+      "name": "REMARKS",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "LOAN_IRREGULAR_REPORT": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "SR_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "NAME_OF_BORROWER",
+      "type": "varchar"
+    },
+    {
+      "name": "TYPE",
+      "type": "varchar"
+    },
+    {
+      "name": "CAT",
+      "type": "varchar"
+    },
+    {
+      "name": "DESCRIPT",
+      "type": "varchar"
+    },
+    {
+      "name": "APPROVAL_DATE",
+      "type": "varchar"
+    },
+    {
+      "name": "OUTSTANDING",
+      "type": "varchar"
+    },
+    {
+      "name": "THEO_BAL",
+      "type": "varchar"
+    },
+    {
+      "name": "IRREGULARITY",
+      "type": "varchar"
+    },
+    {
+      "name": "INTEREST",
+      "type": "varchar"
+    },
+    {
+      "name": "INSTALMENT",
+      "type": "varchar"
+    },
+    {
+      "name": "EMI_NONEMI",
+      "type": "varchar"
+    },
+    {
+      "name": "OLD_BAD_IND",
+      "type": "varchar"
+    },
+    {
+      "name": "NEW_BAD_IND",
+      "type": "varchar"
+    },
+    {
+      "name": "DATE",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "LISTOF_NPA_ACCOUNTS_LOND2572": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "SR_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NUMBER",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "INCA",
+      "type": "varchar"
+    },
+    {
+      "name": "UIPY",
+      "type": "varchar"
+    },
+    {
+      "name": "OLD_IRAC",
+      "type": "varchar"
+    },
+    {
+      "name": "NEW_IRAC",
+      "type": "varchar"
+    },
+    {
+      "name": "NPA_DATE",
+      "type": "varchar"
+    },
+    {
+      "name": "OUTSTANDING",
+      "type": "varchar"
+    },
+    {
+      "name": "ARR_COND",
+      "type": "varchar"
+    },
+    {
+      "name": "SYS1",
+      "type": "varchar"
+    },
+    {
+      "name": "SYS2",
+      "type": "varchar"
+    },
+    {
+      "name": "INT_AMT",
+      "type": "varchar"
+    },
+    {
+      "name": "PRODUCT",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "PROBABLE_NPA_REPORT_LOND2463": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "SR_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "FACILITY",
+      "type": "varchar"
+    },
+    {
+      "name": "LIMIT",
+      "type": "varchar"
+    },
+    {
+      "name": "OUTSTANDING",
+      "type": "varchar"
+    },
+    {
+      "name": "RISK_GRADE",
+      "type": "varchar"
+    },
+    {
+      "name": "HOME_BRCH",
+      "type": "varchar"
+    },
+    {
+      "name": "OFFICE_PHONE",
+      "type": "varchar"
+    },
+    {
+      "name": "HOME_PHONE",
+      "type": "varchar"
+    },
+    {
+      "name": "REMARKS",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "ARREARS_BREAK_UP_LOND2498": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "LOAN_ACCOUNT",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_1D_28D",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_1D_28D",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_29D_3M",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_29D_3M",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_3M_6M",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_3M_6M",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_6M_1Y",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_6M_1Y",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_1Y_3Y",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_1Y_3Y",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_3Y_5Y",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_3Y_5Y",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_5Y_7Y",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_5Y_7Y",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_7Y_10Y",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_7Y_10Y",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_10Y_15Y",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_10Y_15Y",
+      "type": "varchar"
+    },
+    {
+      "name": "ARREARS_15Y_ABOVE",
+      "type": "varchar"
+    },
+    {
+      "name": "AC_BAL_15Y_ABOVE",
+      "type": "varchar"
+    },
+    {
+      "name": "PRODUCT_DESCRIPTION",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "DEPOSITS_BALANCE_FILE_DEPD0586": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "ACCOUNT_NUMBER",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_TYPE",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "AVAILABLE_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "UNCLEARED_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "CURRENT_BALANCE",
+      "type": "varchar"
+    },
+    {
+      "name": "LIMIT",
+      "type": "varchar"
+    },
+    {
+      "name": "TERM",
+      "type": "varchar"
+    },
+    {
+      "name": "INT_RATE",
+      "type": "varchar"
+    },
+    {
+      "name": "STATUS",
+      "type": "varchar"
+    },
+    {
+      "name": "JOINT_HOLD_FLAG",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "ACCOUNT_CLOSED_REPORT": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "SR_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NUMBER",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PRODUCT",
+      "type": "varchar"
+    },
+    {
+      "name": "PRODUCT_DESCRIPTION",
+      "type": "varchar"
+    },
+    {
+      "name": "CLOSED_DATE",
+      "type": "varchar"
+    },
+    {
+      "name": "SYS",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "EXCEPTION_REPORT_DEPD0670": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "TRAN_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "RESULT",
+      "type": "varchar"
+    },
+    {
+      "name": "JRNL_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCOUNT_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "AMOUNT",
+      "type": "varchar"
+    },
+    {
+      "name": "SUP_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "SUP_ERR_NO",
+      "type": "varchar"
+    },
+    {
+      "name": "ERROR_DESC",
+      "type": "varchar"
+    },
+    {
+      "name": "OUTSTANDING",
+      "type": "varchar"
+    },
+    {
+      "name": "LIMIT_AMOUNT",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ],
+  "EXCEPTION_REPORT_FOR_INTEREST_RATES_VARIATION_DEPD0650": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "ACCOUNT_NUMBER",
+      "type": "varchar"
+    },
+    {
+      "name": "CUSTOMER_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "SANCTION_AMOUNT",
+      "type": "varchar"
+    },
+    {
+      "name": "ACCT_TYPE",
+      "type": "varchar"
+    },
+    {
+      "name": "SUB_TYPE",
+      "type": "varchar"
+    },
+    {
+      "name": "PRODUCT_INT_RATE",
+      "type": "varchar"
+    },
+    {
+      "name": "EFFECTIVE_INT_RATE",
+      "type": "varchar"
+    },
+    {
+      "name": "REPORT_ID",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_CODE",
+      "type": "varchar"
+    },
+    {
+      "name": "BRANCH_NAME",
+      "type": "varchar"
+    },
+    {
+      "name": "PROC_DATE",
+      "type": "varchar"
+    }
+  ]
+}

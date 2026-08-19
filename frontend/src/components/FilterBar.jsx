@@ -14,6 +14,8 @@ const FilterBar = ({
   setStartDate,
   endDate,
   setEndDate,
+  selectedProduct,
+  setSelectedProduct,
   setActiveModal
 }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -24,7 +26,7 @@ const FilterBar = ({
   const [localBranch, setLocalBranch] = useState(selectedBranch);
   const [localStartDate, setLocalStartDate] = useState(startDate || '');
   const [localEndDate, setLocalEndDate] = useState(endDate || '');
-  const [product, setProduct] = useState('All Products');
+  const [localProduct, setLocalProduct] = useState(selectedProduct || 'All Products');
   const [status, setStatus] = useState('All');
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
 
@@ -46,6 +48,7 @@ const FilterBar = ({
     setSelectedBranch(localBranch);
     setStartDate(localStartDate);
     setEndDate(localEndDate);
+    if (setSelectedProduct) setSelectedProduct(localProduct);
   };
 
   const handleReset = () => {
@@ -57,7 +60,8 @@ const FilterBar = ({
     setEndDate('');
     setLocalBranch('ALL');
     setSelectedBranch('ALL');
-    setProduct('All Products');
+    setLocalProduct('All Products');
+    if (setSelectedProduct) setSelectedProduct('All Products');
     setStatus('All');
   };
 
@@ -206,8 +210,8 @@ const FilterBar = ({
           <label style={{ fontSize: '11px', fontWeight: '600', color: '#0F172A' }}>Product</label>
           <div style={{ display: 'flex', alignItems: 'center', background: '#FFFFFF', border: '1px solid #E2E8F0', padding: '8px 12px', borderRadius: '6px' }}>
             <select 
-              value={product} 
-              onChange={(e) => setProduct(e.target.value)}
+              value={localProduct} 
+              onChange={(e) => setLocalProduct(e.target.value)}
               style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', minWidth: '140px', cursor: 'pointer' }}
             >
               <option value="All Products">All Products</option>

@@ -56,35 +56,41 @@ const KPICard = ({ title, value, isCurrency = true, changePercent, changeType = 
       </div>
       
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 'auto' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
-            <span style={{ 
-              color: sparklineColor, 
-              fontWeight: '700', 
-              display: 'flex', 
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              {changeType === 'positive' ? '▲' : '▼'} {changePercent}%
-            </span>
-          </div>
-          <div style={{ color: '#64748B', fontSize: '11px', marginTop: '4px' }}>vs last 30D</div>
-        </div>
+        {changePercent ? (
+          <>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                <span style={{ 
+                  color: sparklineColor, 
+                  fontWeight: '700', 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  {changeType === 'positive' ? '▲' : '▼'} {changePercent}%
+                </span>
+              </div>
+              <div style={{ color: '#64748B', fontSize: '11px', marginTop: '4px' }}>Trend</div>
+            </div>
 
-        <div style={{ width: '80px', height: '30px' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={sparklineData}>
-              <Line 
-                type="monotone" 
-                dataKey="value" 
-                stroke={sparklineColor} 
-                strokeWidth={2} 
-                dot={false} 
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+            <div style={{ width: '80px', height: '30px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke={sparklineColor} 
+                    strokeWidth={2} 
+                    dot={false} 
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        ) : (
+           <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '4px' }}>Aggregated by backend</div>
+        )}
       </div>
     </div>
   );

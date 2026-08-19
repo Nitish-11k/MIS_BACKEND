@@ -19,17 +19,18 @@ const Dashboard = () => {
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [selectedPeriod, setSelectedPeriod] = useState('30D');
+  const [selectedProduct, setSelectedProduct] = useState('All Products');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  
-  const [kpiData, setKpiData] = useState({ total_deposits: 428600000000, total_loans: 312400000000, total_npa: 21800000000 });
-  const [accountMetrics, setAccountMetrics] = useState({ opened: 14832, closed: 3219 });
+  const [kpiData, setKpiData] = useState({ total_deposits: 0, total_loans: 0, total_npa: 0 });
+  const [accountMetrics, setAccountMetrics] = useState({ opened: 0, closed: 0 });
   const [branchNpaData, setBranchNpaData] = useState([]);
   const [barChartData, setBarChartData] = useState([]);
   const [pieData, setPieData] = useState([]);
   const [trendData, setTrendData] = useState([]);
   const [npaSummaryData, setNpaSummaryData] = useState([]);
   const [auditData, setAuditData] = useState([]);
+  const [npaTrendData, setNpaTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -53,16 +54,16 @@ const Dashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        let dateParams = `period=${selectedPeriod}`;
+        let dateParams = `period=${selectedPeriod}&product=${selectedProduct}`;
         if (startDate && endDate) {
-          dateParams = `start_date=${startDate}&end_date=${endDate}`;
+          dateParams = `start_date=${startDate}&end_date=${endDate}&product=${selectedProduct}`;
         } else if (startDate) {
-          dateParams = `start_date=${startDate}`;
+          dateParams = `start_date=${startDate}&product=${selectedProduct}`;
         }
 
         const [
           kpiRes, accountRes, branchNpaRes,
-          prodData, pieRes, trendDataRes, npaSummaryRes, auditRes
+          prodData, pieRes, trendDataRes, npaSummaryRes, auditRes, npaTrendRes
         ] = await Promise.all([
           fetch(`http://localhost:8000/api/kpi-summary?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
           fetch(`http://localhost:8000/api/account-metrics?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
@@ -71,17 +72,19 @@ const Dashboard = () => {
           fetch(`http://localhost:8000/api/deposits-by-type?branch_code=${selectedBranch}`).then(res => res.json()),
           fetch(`http://localhost:8000/api/trend-data?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
           fetch(`http://localhost:8000/api/npa-summary?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => []),
-          fetch(`http://localhost:8000/api/audit-exceptions?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => [])
+          fetch(`http://localhost:8000/api/audit-exceptions?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => []),
+          fetch(`http://localhost:8000/api/npa-trend?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => [])
         ]);
 
         setKpiData(kpiRes || {});
         setAccountMetrics(accountRes || {});
         setBranchNpaData(Array.isArray(branchNpaRes) ? branchNpaRes : []);
-        setBarChartData(Array.isArray(prodData) && prodData.length > 0 ? prodData.slice(0,7).map(d => ({ name: d.name.substring(0, 10), Credit: (d.credit||0)/100000, Debit: (d.debit||0)/100000 })) : []);
+        setBarChartData(Array.isArray(prodData) && prodData.length > 0 ? prodData.slice(0,7).map(d => ({ name: d.name.substring(0, 10), Deposits: (d.credit||0)/100000, Loans: (d.debit||0)/100000 })) : []);
         setPieData(Array.isArray(pieRes) ? pieRes : []);
         setTrendData(Array.isArray(trendDataRes) ? trendDataRes : []);
         setNpaSummaryData(Array.isArray(npaSummaryRes) ? npaSummaryRes : []);
         setAuditData(Array.isArray(auditRes) ? auditRes : []);
+        setNpaTrendData(Array.isArray(npaTrendRes) ? npaTrendRes : []);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -179,12 +182,16 @@ const Dashboard = () => {
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
           branches={branches}
-          selectedBranch={selectedBranch} setSelectedBranch={setSelectedBranch}
-          selectedPeriod={selectedPeriod} setSelectedPeriod={setSelectedPeriod}
+          selectedBranch={selectedBranch}
+          setSelectedBranch={setSelectedBranch}
+          selectedPeriod={selectedPeriod}
+          setSelectedPeriod={setSelectedPeriod}
           startDate={startDate}
           setStartDate={setStartDate}
           endDate={endDate}
           setEndDate={setEndDate}
+          selectedProduct={selectedProduct}
+          setSelectedProduct={setSelectedProduct}
           setActiveModal={setActiveModal}
         />
 
@@ -199,6 +206,8 @@ const Dashboard = () => {
               trendData={trendData}
               npaSummaryData={npaSummaryData}
               auditData={auditData}
+              npaTrendData={npaTrendData}
+              selectedPeriod={selectedPeriod}
               setActiveModal={setActiveModal}
               setActiveTab={setActiveTab}
             />

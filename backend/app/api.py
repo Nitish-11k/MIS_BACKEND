@@ -308,6 +308,36 @@ def stop_upload():
 
 # --- END UPLOAD ENGINE ---
 
+
+def get_fact_date_filter_sql(period: str = None, table_name: str = "", prefix: str = "WHERE", date_col: str = "snapshot_date", start_date: str = None, end_date: str = None):
+    if start_date and end_date:
+        sql = f" {prefix} {table_name}.{date_col} BETWEEN CONVERT(date, ?, 120) AND CONVERT(date, ?, 120) "
+        return sql, [start_date, end_date]
+    elif start_date:
+        sql = f" {prefix} {table_name}.{date_col} = CONVERT(date, ?, 120) "
+        return sql, [start_date]
+
+    if period == "ALL" or not period:
+        return "", []
+
+    import re
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", period):
+        sql = f" {prefix} {table_name}.{date_col} = CONVERT(date, ?, 120) "
+        return sql, [period]
+
+    days = 0
+    if period == "7D": days = 7
+    elif period == "15D": days = 15
+    elif period == "30D": days = 30
+    elif period == "90D": days = 90
+    elif period == "6M": days = 180
+    elif period == "1Y": days = 365
+    elif period == "YTD": days = 365
+    else: return "", []
+
+    sql = f" {prefix} {table_name}.{date_col} >= DATEADD(day, -?, (SELECT MAX({date_col}) FROM {table_name})) "
+    return sql, [days]
+
 def get_date_filter_sql(period: str = None, table_name: str = "", prefix: str = "WHERE", date_col: str = "PROC_DATE", start_date: str = None, end_date: str = None):
     """Generates SQL condition for filtering by period based on the max date in the table, or by exact date."""
     if start_date and end_date:
@@ -599,125 +629,37 @@ def get_total_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_d
 
 @app.get("/api/deposit-branch-wise")
 @lru_cache(maxsize=128)
-def get_deposit_branch_wise(
-    branch_code: str = "ALL",
-    period: str = "ALL"
-):
-    """
-    Branch-wise deposit balance.
-
-    Source:
-        DEPOSITS_BALANCE_FILE_DEPD0586
-
-    Amount:
-        CURRENT_BALANCE
-
-    Duplicate protection:
-        One latest row per BRANCH_CODE + ACCOUNT_NUMBER.
-    """
-
+def get_deposit_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
     conn = get_db_connection()
     cursor = conn.cursor()
-
     try:
-        where_dep, params_dep = get_date_filter_sql(
-            period,
-            "DEPOSITS_BALANCE_FILE_DEPD0586"
-        )
-
-        branch_condition = ""
-
+        where_dep, params_dep = get_fact_date_filter_sql(period, "fact_deposit_master_daily", start_date=start_date, end_date=end_date)
         if branch_code != "ALL":
-            branch_condition = " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
+            where_dep += " AND fact_deposit_master_daily.branch_code = ?" if "WHERE" in where_dep else " WHERE fact_deposit_master_daily.branch_code = ?"
             params_dep.append(branch_code)
 
         query = f"""
-            WITH LatestAccounts AS (
-                SELECT
-                    ID,
-                    ACCOUNT_NUMBER,
-                    BRANCH_CODE,
-                    BRANCH_NAME,
-                    CURRENT_BALANCE,
-
-                    ROW_NUMBER() OVER (
-                        PARTITION BY
-                            BRANCH_CODE,
-                            ACCOUNT_NUMBER
-                        ORDER BY ID DESC
-                    ) AS rn
-
-                FROM DEPOSITS_BALANCE_FILE_DEPD0586
-                {where_dep}
-                {branch_condition}
-            )
-
-            SELECT
-                BRANCH_CODE,
-                BRANCH_NAME,
-
-                SUM(
-                    TRY_CAST(
-                        REPLACE(
-                            ISNULL(CURRENT_BALANCE, '0'),
-                            ',',
-                            ''
-                        ) AS FLOAT
-                    )
-                ) AS TOTAL_DEPOSITS,
-
-                COUNT(*) AS ACCOUNT_COUNT
-
-            FROM LatestAccounts
-
-            WHERE rn = 1
-
-            GROUP BY
-                BRANCH_CODE,
-                BRANCH_NAME
-
+            SELECT TOP 10 fact_deposit_master_daily.branch_code, dim_branch_hierarchy.branch_name, SUM(fact_deposit_master_daily.current_balance) AS TOTAL_DEPOSITS, COUNT(*) AS ACCOUNT_COUNT
+            FROM fact_deposit_master_daily
+            LEFT JOIN dim_branch_hierarchy ON fact_deposit_master_daily.branch_code = dim_branch_hierarchy.branch_code
+            {where_dep}
+            GROUP BY fact_deposit_master_daily.branch_code, dim_branch_hierarchy.branch_name
             ORDER BY TOTAL_DEPOSITS DESC
         """
-
         cursor.execute(query, params_dep)
-
         rows = cursor.fetchall()
-
         data = []
-
         for row in rows:
-            data.append(
-                {
-                    "branch_code": str(row[0]).strip()
-                    if row[0] is not None
-                    else "",
-
-                    "name": (
-                        str(row[1]).strip()
-                        if row[1]
-                        else "Unknown"
-                    ),
-
-                    # IMPORTANT:
-                    # SmartModal expects `value`.
-                    "value": float(row[2])
-                    if row[2] is not None
-                    else 0.0,
-
-                    "account_count": int(row[3])
-                    if row[3] is not None
-                    else 0,
-                }
-            )
-
+            data.append({
+                "branch_code": str(row[0]).strip() if row[0] else "",
+                "name": str(row[1]).strip() if row[1] else "Unknown",
+                "value": float(row[2]) if row[2] else 0.0,
+                "account_count": int(row[3]) if row[3] else 0,
+            })
         return data
-
     except Exception as e:
-        import pyodbc
-        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
-            print(f"Error calculating branch-wise deposits: {e}")
+        print(f"Error calculating branch-wise deposits: {e}")
         return []
-
     finally:
         conn.close()
 
@@ -725,204 +667,63 @@ def get_deposit_branch_wise(
 
 @app.get("/api/kpi-summary")
 @lru_cache(maxsize=128)
-def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
-    """
-    KPI summary.
-
-    Deposit calculation:
-    - Uses DEPOSITS_BALANCE_FILE_DEPD0586
-    - Uses CURRENT_BALANCE
-    - Applies selected branch
-    - Applies selected exact date / period
-    - Prevents duplicate account rows from inflating the total
-    - Does NOT use ABS(SUM(...))
-    """
-
+def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None, product: str = "All Products"):
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    data = {
-        "total_deposits": 0,
-        "total_loans": 0,
-        "total_npa": 0,
-        "branches_reporting": 0,
-    }
+    data = {"total_deposits": 0, "total_loans": 0, "total_npa": 0, "branches_reporting": 0}
 
     try:
-        # =========================================================
         # DEPOSITS
-        # =========================================================
-        where_dep, params_dep = get_date_filter_sql(
-            period,
-            "DEPOSITS_BALANCE_FILE_DEPD0586"
-        )
+        if product in ["All Products", "Savings", "Current"]:
+            where_dep, params_dep = get_fact_date_filter_sql(period, "fact_deposit_master_daily", prefix="WHERE", start_date=start_date, end_date=end_date)
+            if branch_code != "ALL":
+                where_dep += " AND branch_code = ?" if "WHERE" in where_dep else " WHERE branch_code = ?"
+                params_dep.append(branch_code)
+                
+            if product == "Savings":
+                where_dep += " AND account_type = 'Savings'" if "WHERE" in where_dep else " WHERE account_type = 'Savings'"
+            elif product == "Current":
+                where_dep += " AND account_type = 'Current'" if "WHERE" in where_dep else " WHERE account_type = 'Current'"
 
-        branch_condition = ""
-        if branch_code != "ALL":
-            branch_condition = " AND BRANCH_CODE = ?" if "WHERE" in where_dep else " WHERE BRANCH_CODE = ?"
-            params_dep.append(branch_code)
-
-        # We first select one record per ACCOUNT_NUMBER.
-        #
-        # This protects the KPI from duplicate account rows in the
-        # imported report.
-        #
-        # ID is the internal auto-increment ID generated by the
-        # ingestion layer and gives us deterministic latest-row
-        # selection when duplicates exist.
-        deposit_sql = f"""
-            WITH LatestAccounts AS (
-                SELECT
-                    ID,
-                    ACCOUNT_NUMBER,
-                    BRANCH_CODE,
-                    BRANCH_NAME,
-                    PROC_DATE,
-                    CURRENT_BALANCE,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY
-                            BRANCH_CODE,
-                            ACCOUNT_NUMBER
-                        ORDER BY ID DESC
-                    ) AS rn
-                FROM DEPOSITS_BALANCE_FILE_DEPD0586
-                {where_dep}
-                {branch_condition}
-            )
-            SELECT
-                SUM(
-                    TRY_CAST(
-                        REPLACE(
-                            ISNULL(CURRENT_BALANCE, '0'),
-                            ',',
-                            ''
-                        ) AS FLOAT
-                    )
-                )
-            FROM LatestAccounts
-            WHERE rn = 1
-        """
-
-        cursor.execute(deposit_sql, params_dep)
-        result = cursor.fetchone()
-
-        if result and result[0] is not None:
-            data["total_deposits"] = float(result[0])
-
-        # =========================================================
-        # LOANS
-        # =========================================================
-        where_loan, params_loan = get_date_filter_sql(
-            period,
-            "BAL_IN_LOAN_ACC_GLCC_WISE_DET"
-        )
-
-        if branch_code != "ALL":
-            where_loan += (
-                " AND BRANCH_CODE = ?"
-                if "WHERE" in where_loan
-                else " WHERE BRANCH_CODE = ?"
-            )
-            params_loan.append(branch_code)
-
-        cursor.execute(
-            f"""
-            SELECT
-                SUM(
-                    TRY_CAST(
-                        REPLACE(
-                            ISNULL(DR_BALANCE, '0'),
-                            ',',
-                            ''
-                        ) AS FLOAT
-                    )
-                )
-            FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
-            {where_loan}
-            """,
-            params_loan,
-        )
-
-        result = cursor.fetchone()
-
-        if result and result[0] is not None:
-            data["total_loans"] = float(result[0])
-
-        # =========================================================
-        # NPA
-        # =========================================================
-        where_npa, params_npa = get_date_filter_sql(
-            period,
-            "LIST_OF_NPA_ACCOUNTS",
-            "WHERE"
-        )
-
-        if branch_code != "ALL":
-            where_npa += (
-                " AND BRANCH_CODE = ?"
-                if "WHERE" in where_npa
-                else " WHERE BRANCH_CODE = ?"
-            )
-            params_npa.append(branch_code)
-
-        cursor.execute(
-            f"""
-            SELECT
-                SUM(
-                    TRY_CAST(
-                        REPLACE(
-                            ISNULL(OUTSTANDING, '0'),
-                            ',',
-                            ''
-                        ) AS FLOAT
-                    )
-                )
-            FROM LIST_OF_NPA_ACCOUNTS
-            {where_npa}
-            """,
-            params_npa,
-        )
-
-        result = cursor.fetchone()
-
-        if result and result[0] is not None:
-            data["total_npa"] = float(result[0])
-
-        # =========================================================
-        # BRANCHES REPORTING
-        # =========================================================
-        if branch_code == "ALL":
-
-            where_br, params_br = get_date_filter_sql(
-                period,
-                "DEPOSITS_BALANCE_FILE_DEPD0586"
-            )
-
-            cursor.execute(
-                f"""
-                SELECT COUNT(DISTINCT BRANCH_CODE)
-                FROM DEPOSITS_BALANCE_FILE_DEPD0586
-                {where_br}
-                """,
-                params_br,
-            )
-
+            cursor.execute(f"SELECT SUM(current_balance) FROM fact_deposit_master_daily {where_dep}", params_dep)
             result = cursor.fetchone()
+            if result and result[0] is not None:
+                data["total_deposits"] = float(result[0])
 
+        # LOANS & NPA
+        if product in ["All Products", "Loans"]:
+            where_loan, params_loan = get_fact_date_filter_sql(period, "fact_loan_master_daily", prefix="WHERE", start_date=start_date, end_date=end_date)
+            if branch_code != "ALL":
+                where_loan += " AND branch_code = ?" if "WHERE" in where_loan else " WHERE branch_code = ?"
+                params_loan.append(branch_code)
+
+            cursor.execute(f"SELECT SUM(outstanding_balance) FROM fact_loan_master_daily {where_loan}", params_loan)
+            result = cursor.fetchone()
+            if result and result[0] is not None:
+                data["total_loans"] = float(result[0])
+
+            where_npa, params_npa = get_fact_date_filter_sql(period, "fact_npa_rbi_master", prefix="WHERE", start_date=start_date, end_date=end_date)
+            if branch_code != "ALL":
+                where_npa += " AND branch_code = ?" if "WHERE" in where_npa else " WHERE branch_code = ?"
+                params_npa.append(branch_code)
+
+            cursor.execute(f"SELECT SUM(gross_npa_amount) FROM fact_npa_rbi_master {where_npa}", params_npa)
+            result = cursor.fetchone()
+            if result and result[0] is not None:
+                data["total_npa"] = float(result[0])
+
+        if branch_code == "ALL":
+            where_br, params_br = get_fact_date_filter_sql(period, "fact_deposit_master_daily")
+            cursor.execute(f"SELECT COUNT(DISTINCT branch_code) FROM fact_deposit_master_daily {where_br}", params_br)
+            result = cursor.fetchone()
             if result and result[0] is not None:
                 data["branches_reporting"] = int(result[0])
-
         else:
             data["branches_reporting"] = 1
-
     except Exception as e:
-        import pyodbc
-        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
-            print(f"Error calculating KPIs: {e}")
-
+        print(f"Error calculating KPIs: {e}")
     finally:
         conn.close()
-
     return data
 
 
@@ -988,17 +789,17 @@ def get_gl_summary(branch_code: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    where_clause = "WHERE LEDGER_NAME IS NOT NULL AND LEDGER_NAME != ''"
+    where_clause = "WHERE gl_name IS NOT NULL AND gl_name != ''"
     params = []
     if branch_code != "ALL":
-        where_clause += " AND BRANCH_CODE = ?"
+        where_clause += " AND branch_code = ?"
         params.append(branch_code)
         
     cursor.execute(f"""
-        SELECT TOP 6 LEDGER_NAME, BRANCH_NAME, SUM(CAST(ISNULL(NULLIF(CR_BALANCE, ''), '0') AS FLOAT) + CAST(ISNULL(NULLIF(DR_BALANCE, ''), '0') AS FLOAT)) as TotalVolume
-        FROM BAL_IN_GL_ACC_GLCC_WISE_DET
+        SELECT TOP 6 gl_name, branch_code, SUM(cr_balance + dr_balance) as TotalVolume
+        FROM fact_gl_balances_daily
         {where_clause}
-        GROUP BY LEDGER_NAME, BRANCH_NAME
+        GROUP BY gl_name, branch_code
         ORDER BY TotalVolume DESC
     """, params)
     rows = cursor.fetchall()
@@ -1094,17 +895,17 @@ def get_glcc_summary(branch_code: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    where_clause = "WHERE NAME IS NOT NULL AND NAME != '' AND TOTAL_AMOUNT IS NOT NULL AND TOTAL_AMOUNT != ''"
+    where_clause = "WHERE gl_name IS NOT NULL AND gl_name != ''"
     params = []
     if branch_code != "ALL":
-        where_clause += " AND BRANCH_CODE = ?"
+        where_clause += " AND branch_code = ?"
         params.append(branch_code)
         
     cursor.execute(f"""
-        SELECT TOP 8 NAME, ACT_TOTAL,
-            CAST(REPLACE(REPLACE(TOTAL_AMOUNT, ',', ''), '-', '') AS FLOAT) as amount
-        FROM GLCC_WISE_SUM_REP
+        SELECT TOP 8 gl_name, COUNT(*) as accounts, SUM(ABS(net_balance)) as amount
+        FROM fact_gl_balances_daily
         {where_clause}
+        GROUP BY gl_name
         ORDER BY amount DESC
     """, params)
     rows = cursor.fetchall()
@@ -1114,7 +915,7 @@ def get_glcc_summary(branch_code: str = "ALL"):
     for row in rows:
         data.append({
             "name": row[0][:25] if row[0] else "Unknown",
-            "accounts": int(row[1]) if row[1] and str(row[1]).isdigit() else 0,
+            "accounts": int(row[1]) if row[1] else 0,
             "amount": float(row[2]) if row[2] else 0
         })
     return data
@@ -1127,18 +928,17 @@ def get_gl_daybook_summary(branch_code: str = "ALL"):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    where_clause = "WHERE TXN_TYPE IS NOT NULL AND TXN_TYPE != ''"
+    where_clause = "WHERE txn_type IS NOT NULL AND txn_type != ''"
     params = []
     if branch_code != "ALL":
-        where_clause += " AND BRANCH_CODE = ?"
+        where_clause += " AND branch_code = ?"
         params.append(branch_code)
         
     cursor.execute(f"""
-        SELECT TOP 6 TXN_TYPE, COUNT(*) as cnt,
-            SUM(CASE WHEN ISNUMERIC(REPLACE(DEBIT, ',', ''))=1 THEN CAST(REPLACE(DEBIT, ',', '') AS FLOAT) ELSE 0 END) as total_debit
-        FROM GL_DAYBOOK_GEND0807
+        SELECT TOP 6 txn_type, COUNT(*) as cnt, SUM(debit_amount) as total_debit
+        FROM fact_gl_transactions_daily
         {where_clause}
-        GROUP BY TXN_TYPE
+        GROUP BY txn_type
         ORDER BY cnt DESC
     """, params)
     rows = cursor.fetchall()
@@ -1161,8 +961,8 @@ def get_exceptions():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT TOP 10 ACCOUNT_NO, AMOUNT, CUSTOMER_NAME, ERROR_DESC, OUTSTANDING
-        FROM EXCEPTION_REPORT_DEPD0670
+        SELECT TOP 10 account_no, breach_amount as amount, '-' as customer_name, exception_description as error_desc, 0 as outstanding
+        FROM fact_ews_audit_exceptions
     """)
     rows = cursor.fetchall()
     conn.close()
@@ -1553,6 +1353,39 @@ def get_loan_type_branches(product_name: str, branch_code: str = "ALL", period: 
 # ==========================================
 # Trend Chart Data (Loans vs Deposits over time)
 # ==========================================
+def pad_trend_dates(data_list, period):
+    if not data_list or period not in ["7D", "30D", "90D"]:
+        return data_list
+        
+    days_to_pad = {"7D": 7, "30D": 30, "90D": 90}.get(period)
+    max_date_str = max([x["name"] for x in data_list])
+    
+    from datetime import datetime, timedelta
+    try:
+        max_date = datetime.strptime(max_date_str, "%Y-%m-%d")
+        existing_dates = {x["name"]: x for x in data_list}
+        padded_list = []
+        
+        sample_keys = [k for k in data_list[0].keys() if k != "name"]
+        
+        for i in range(days_to_pad - 1, -1, -1):
+            dt = max_date - timedelta(days=i)
+            dt_str = dt.strftime("%Y-%m-%d")
+            
+            if dt_str in existing_dates:
+                padded_list.append(existing_dates[dt_str])
+            else:
+                new_entry = {"name": dt_str}
+                for k in sample_keys:
+                    new_entry[k] = 0
+                padded_list.append(new_entry)
+                
+        return padded_list
+    except Exception as e:
+        print("Error padding dates:", e)
+        return data_list
+
+
 @app.get("/api/trend-data")
 def get_trend_data(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
     conn = get_db_connection()
@@ -1605,6 +1438,7 @@ def get_trend_data(branch_code: str = "ALL", period: str = "ALL", start_date: Op
             
         # Sort by date
         data = sorted(list(trends.values()), key=lambda x: x["name"])
+        data = pad_trend_dates(data, period)
     except Exception as e:
         import pyodbc
         if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
@@ -1791,8 +1625,22 @@ def get_account_metrics(branch_code: str = "ALL", period: str = "ALL", start_dat
     conn.close()
     return data
 
+def run_master_etl():
+    try:
+        import subprocess
+        script_path = os.path.join(os.path.dirname(__file__), "..", "etl_master_tables.py")
+        print(f"Background Task: Starting ETL job {script_path}")
+        result = subprocess.run(["python", script_path], capture_output=True, text=True)
+        print("Background Task: ETL job completed")
+        if result.returncode != 0:
+            print(f"ETL Error:\n{result.stderr}")
+    except Exception as e:
+        print(f"Background Task: ETL failed to run: {e}")
+
+from fastapi import BackgroundTasks
+
 @app.post("/api/upload")
-async def upload_file(files: list[UploadFile] = File(...)):
+async def upload_file(background_tasks: BackgroundTasks, files: list[UploadFile] = File(...)):
     try:
         from app.parser.dispatcher import process_file
         
@@ -1824,6 +1672,10 @@ async def upload_file(files: list[UploadFile] = File(...)):
                 traceback.print_exc()
                 results.append({"filename": file.filename, "status": "error", "message": str(e)})
         
+        # Check if any file was successfully parsed and loaded to staging
+        if any(res["status"] == "success" for res in results):
+            background_tasks.add_task(run_master_etl)
+            
         return {"status": "success", "results": results}
     except Exception as e:
         import traceback
@@ -2303,9 +2155,9 @@ def audit_exceptions(branch_code: Optional[str] = None, period: str = "ALL", sta
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        branch_filter, filter_params = "", []
+        branch_filter, filter_params = get_date_filter_sql(period, "AUDIT_BGL_ACCOUNTS_AGE_WISE_BREAK_UP_GEND0805", date_col="PROC_DATE", start_date=start_date, end_date=end_date)
         if branch_code and branch_code != "ALL":
-            branch_filter = " WHERE BRANCH_CODE = ? "
+            branch_filter += " AND BRANCH_CODE = ? " if "WHERE" in branch_filter else " WHERE BRANCH_CODE = ? "
             filter_params.append(branch_code)
             
         # Combining data from BGL Audit and High Value Txns as proxy for exceptions
@@ -2506,3 +2358,45 @@ def get_deposits_dashboard(branch_code: str = "ALL", period: str = "30D", start_
         import traceback
         traceback.print_exc()
         return {"error": str(e), "overview": {}, "products": [], "branches": []}
+
+@app.get("/api/npa-trend")
+def get_npa_trend(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    where_npa, params_npa = get_fact_date_filter_sql(period, "fact_npa_rbi_master", "WHERE", start_date=start_date, end_date=end_date)
+    if branch_code != "ALL":
+        where_npa += " AND branch_code = ?" if "WHERE" in where_npa else " WHERE branch_code = ?"
+        params_npa.append(branch_code)
+        
+    where_loan, params_loan = get_fact_date_filter_sql(period, "fact_loan_master_daily", "WHERE", start_date=start_date, end_date=end_date)
+    if branch_code != "ALL":
+        where_loan += " AND branch_code = ?" if "WHERE" in where_loan else " WHERE branch_code = ?"
+        params_loan.append(branch_code)
+        
+    try:
+        cursor.execute(f"SELECT CONVERT(VARCHAR, snapshot_date, 23), SUM(gross_npa_amount) FROM fact_npa_rbi_master {where_npa} GROUP BY CONVERT(VARCHAR, snapshot_date, 23)", params_npa)
+        npa_rows = cursor.fetchall()
+        
+        cursor.execute(f"SELECT CONVERT(VARCHAR, snapshot_date, 23), SUM(outstanding_balance) FROM fact_loan_master_daily {where_loan} GROUP BY CONVERT(VARCHAR, snapshot_date, 23)", params_loan)
+        loan_rows = cursor.fetchall()
+        
+        loans_by_date = {r[0]: r[1] for r in loan_rows if r[1]}
+        
+        data = []
+        for r in npa_rows:
+            dte = r[0]
+            npa_amt = r[1] or 0
+            loan_amt = loans_by_date.get(dte, 0)
+            pct = (npa_amt / loan_amt * 100) if loan_amt > 0 else 0
+            data.append({"name": dte, "value": round(pct, 2)})
+            
+        data = sorted(data, key=lambda x: x["name"])
+        data = pad_trend_dates(data, period)
+    except Exception as e:
+        print(f"Error fetching NPA trend: {e}")
+        data = []
+    finally:
+        conn.close()
+        
+    return data

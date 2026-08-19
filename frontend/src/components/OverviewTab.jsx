@@ -8,23 +8,6 @@ import { ArrowRight, ShieldCheck } from 'lucide-react';
 
 const COLORS = ['#0F172A', '#D4AF37', '#10B981', '#8B5CF6', '#EF4444'];
 
-// Dummy data for mockup completeness
-const npaTrendData = [
-  { name: '13 Jul', value: 0.8 }, { name: '16 Jul', value: 1.1 },
-  { name: '20 Jul', value: 0.9 }, { name: '23 Jul', value: 1.2 },
-  { name: '27 Jul', value: 1.4 }, { name: '30 Jul', value: 1.3 },
-  { name: '03 Aug', value: 1.6 }, { name: '06 Aug', value: 1.4 },
-  { name: '10 Aug', value: 2.2 }
-];
-
-const topBranchesData = [
-  { name: 'Connaught Place', value: 125.48 },
-  { name: 'Saket', value: 98.62 },
-  { name: 'Dwarka', value: 87.25 },
-  { name: 'Noida Sector 18', value: 74.31 },
-  { name: 'Gurgaon Main', value: 65.12 }
-];
-
 const OverviewTab = ({
   kpiData,
   accountMetrics,
@@ -34,6 +17,8 @@ const OverviewTab = ({
   trendData,
   npaSummaryData,
   auditData,
+  npaTrendData,
+  selectedPeriod,
   setActiveModal,
   setActiveTab,
 }) => {
@@ -55,12 +40,12 @@ const OverviewTab = ({
       
       {/* KPI ROW */}
       <div className="overview-kpi-grid">
-        <KPICard title="TOTAL ACCOUNTS" value={accountMetrics?.total || 0} isCurrency={false} changePercent="7.2" changeType="positive" onClick={() => setActiveModal('total')} />
-        <KPICard title="TOTAL DEPOSITS" value={kpiData?.total_deposits || 0} isCurrency={true} changePercent="8.3" changeType="positive" onClick={() => setActiveModal('deposits')} />
-        <KPICard title="TOTAL LOANS" value={kpiData?.total_loans || 0} isCurrency={true} changePercent="6.1" changeType="positive" onClick={() => setActiveModal('loans')} />
-        <KPICard title="TOTAL NPA" value={kpiData?.total_npa || 0} isCurrency={true} changePercent="12.6" changeType="negative" onClick={() => setActiveModal('npa')} />
-        <KPICard title="OPENED ACCOUNTS" value={accountMetrics?.opened || 0} isCurrency={false} changePercent="5.4" changeType="positive" onClick={() => setActiveModal('opened')} />
-        <KPICard title="CLOSED ACCOUNTS" value={accountMetrics?.closed || 0} isCurrency={false} changePercent="3.7" changeType="negative" onClick={() => setActiveModal('closed')} />
+        <KPICard title="TOTAL ACCOUNTS" value={accountMetrics?.total || 0} isCurrency={false} onClick={() => setActiveModal('total')} />
+        <KPICard title="TOTAL DEPOSITS" value={kpiData?.total_deposits || 0} isCurrency={true} onClick={() => setActiveModal('deposits')} />
+        <KPICard title="TOTAL LOANS" value={kpiData?.total_loans || 0} isCurrency={true} onClick={() => setActiveModal('loans')} />
+        <KPICard title="TOTAL NPA" value={kpiData?.total_npa || 0} isCurrency={true} onClick={() => setActiveModal('npa')} />
+        <KPICard title="OPENED ACCOUNTS" value={accountMetrics?.opened || 0} isCurrency={false} onClick={() => setActiveModal('opened')} />
+        <KPICard title="CLOSED ACCOUNTS" value={accountMetrics?.closed || 0} isCurrency={false} onClick={() => setActiveModal('closed')} />
       </div>
 
       {/* MIDDLE ROW (3 Charts) */}
@@ -70,7 +55,7 @@ const OverviewTab = ({
         <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Deposits vs Loans Trend</h3>
-            <select style={{ fontSize: '12px', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '2px 8px', outline: 'none' }}><option>30D</option></select>
+            <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>{selectedPeriod}</span>
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -80,8 +65,8 @@ const OverviewTab = ({
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
                 <Tooltip cursor={{ fill: '#F8FAFC' }} />
                 <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: '12px' }} />
-                <Bar dataKey="Credit" name="Deposits" fill="#0F172A" barSize={12} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Debit" name="Loans" fill="#D4AF37" barSize={12} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Deposits" name="Deposits" fill="#0F172A" barSize={12} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Loans" name="Loans" fill="#D4AF37" barSize={12} radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -91,7 +76,7 @@ const OverviewTab = ({
         <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>NPA Trend (%)</h3>
-            <select style={{ fontSize: '12px', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '2px 8px', outline: 'none' }}><option>30D</option></select>
+            <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>{selectedPeriod}</span>
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -116,11 +101,11 @@ const OverviewTab = ({
         <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Top 5 Branches by NPA</h3>
-            <select style={{ fontSize: '12px', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '2px 8px', outline: 'none' }}><option>Top 5</option></select>
+            <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>{selectedPeriod}</span>
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sortedNpaData && sortedNpaData.length > 0 ? sortedNpaData : topBranchesData} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }} barGap={4}>
+              <BarChart data={sortedNpaData && sortedNpaData.length > 0 ? sortedNpaData : []} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
                 <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#0F172A', fontWeight: 500 }} width={100} />
