@@ -528,6 +528,72 @@ def login(req: LoginRequest):
         conn.close()
 
 # ==========================================
+# User Management APIs
+# ==========================================
+@app.get("/api/users")
+def get_users():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT ID, USERNAME, ROLE, REGION_NAME, BRANCH_CODE, FULL_NAME FROM USERS")
+        rows = cursor.fetchall()
+        users = []
+        for row in rows:
+            users.append({
+                "id": row[0],
+                "username": row[1],
+                "role": row[2],
+                "region": row[3],
+                "branch": row[4],
+                "name": row[5]
+            })
+        return {"success": True, "users": users}
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        return {"success": False, "message": "Failed to fetch users"}
+    finally:
+        conn.close()
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+    name: str
+    role: str
+    region: Optional[str] = None
+    branch: Optional[str] = None
+
+@app.post("/api/users")
+def create_user(req: CreateUserRequest):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO USERS (USERNAME, PASSWORD_HASH, ROLE, REGION_NAME, BRANCH_CODE, FULL_NAME)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (req.username, req.password, req.role, req.region, req.branch, req.name))
+        conn.commit()
+        return {"success": True, "message": "User created successfully"}
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        return {"success": False, "message": "Failed to create user"}
+    finally:
+        conn.close()
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM USERS WHERE ID = ?", (user_id,))
+        conn.commit()
+        return {"success": True, "message": "User deleted successfully"}
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        return {"success": False, "message": "Failed to delete user"}
+    finally:
+        conn.close()
+
+# ==========================================
 # 0. Branches List
 # ==========================================
 @app.get("/api/branches")

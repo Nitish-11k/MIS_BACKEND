@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud, User } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud, User, UserPlus } from 'lucide-react';
 import ProfileTab from './ProfileTab';
+import UserManagementTab from './UserManagementTab';
 import FilterBar from './FilterBar';
 import SmartModal from './SmartModal';
 import OverviewTab from './OverviewTab';
@@ -125,6 +126,7 @@ const Dashboard = ({ user, onLogout }) => {
             { id: 'reports', label: 'Reports & Accounts', icon: FileText },
             { id: 'upload', label: 'Data Sync', icon: UploadCloud },
             { id: 'profile', label: 'My Profile', icon: User },
+            ...(user?.role === 'HO' ? [{ id: 'users', label: 'User Management', icon: UserPlus }] : []),
             { id: 'settings', label: 'Settings', icon: Settings },
           ].map(item => (
             <div 
@@ -155,7 +157,12 @@ const Dashboard = ({ user, onLogout }) => {
           ))}
         </div>
 
-        <div style={{ padding: isSidebarOpen ? '20px' : '20px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'flex-start' : 'center', gap: '12px', position: 'relative' }}>
+        <div 
+          onClick={() => setActiveTab('profile')}
+          style={{ padding: isSidebarOpen ? '20px' : '20px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'flex-start' : 'center', gap: '12px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+        >
           <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
             {user?.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
           </div>
@@ -235,6 +242,7 @@ const Dashboard = ({ user, onLogout }) => {
           {activeTab === 'reports' && <ReportsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
           {activeTab === 'upload' && <UploadTab />}
           {activeTab === 'profile' && <ProfileTab user={user} onLogout={onLogout} />}
+          {activeTab === 'users' && user?.role === 'HO' && <UserManagementTab user={user} />}
           {activeTab === 'settings' && <PlaceholderTab title="Settings" description="Configure system preferences, user roles, and UI themes." />}
         </div>
 
