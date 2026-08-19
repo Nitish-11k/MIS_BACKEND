@@ -24,12 +24,22 @@ const Login = ({ onLogin }) => {
   // OTP State
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (username === 'admin' && password === 'admin123') {
-      onLogin();
-    } else {
-      setError('Invalid username or password');
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      if (data.success) {
+        onLogin(data.user);
+      } else {
+        setError(data.message || 'Invalid username or password');
+      }
+    } catch (err) {
+      setError('Failed to connect to server');
     }
   };
 

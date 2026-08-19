@@ -93,9 +93,47 @@ def init_branch_network():
         print(f"Error initializing BRANCH_NETWORK: {e}")
         traceback.print_exc()
 
+def init_users():
+    """Initializes the USERS table if it doesn't exist."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'USERS'")
+        if cursor.fetchone()[0] == 0:
+            print("USERS table not found. Creating it...")
+            cursor.execute("""
+                CREATE TABLE USERS (
+                    ID INT IDENTITY(1,1) PRIMARY KEY,
+                    USERNAME VARCHAR(50) NOT NULL UNIQUE,
+                    PASSWORD_HASH VARCHAR(255) NOT NULL,
+                    ROLE VARCHAR(20) NOT NULL,
+                    REGION_NAME VARCHAR(255),
+                    BRANCH_CODE VARCHAR(50),
+                    FULL_NAME VARCHAR(255)
+                )
+            """)
+            conn.commit()
+            
+            # Insert default test users
+            cursor.execute("""
+                INSERT INTO USERS (USERNAME, PASSWORD_HASH, ROLE, REGION_NAME, BRANCH_CODE, FULL_NAME)
+                VALUES 
+                ('admin', 'admin123', 'HO', NULL, NULL, 'Head Office Admin'),
+                ('ro_user', 'ro123', 'RO', 'DELHI', NULL, 'Regional Manager Delhi'),
+                ('branch_user', 'branch123', 'BRANCH', NULL, '0011', 'Branch Manager CP')
+            """)
+            conn.commit()
+            print("Successfully inserted default users.")
+        conn.close()
+    except Exception as e:
+        print(f"Error initializing USERS: {e}")
+        traceback.print_exc()
+
 @app.on_event("startup")
 async def startup_event():
     init_branch_network()
+    init_users()
 
 # --- UPLOAD ENGINE STATE ---
 upload_state = {
@@ -458,6 +496,37 @@ def get_notifications(branch_code: str = "ALL"):
         
     return notifications
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/login")
+def login(req: LoginRequest):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT ID, USERNAME, ROLE, REGION_NAME, BRANCH_CODE, FULL_NAME FROM USERS WHERE USERNAME = ? AND PASSWORD_HASH = ?", (req.username, req.password))
+        row = cursor.fetchone()
+        if row:
+            return {
+                "success": True,
+                "user": {
+                    "id": row[0],
+                    "username": row[1],
+                    "role": row[2],
+                    "region": row[3],
+                    "branch": row[4],
+                    "name": row[5]
+                }
+            }
+        else:
+            return {"success": False, "message": "Invalid username or password"}
+    except Exception as e:
+        print(f"Error during login: {e}")
+        return {"success": False, "message": "Internal Server Error"}
+    finally:
+        conn.close()
+
 # ==========================================
 # 0. Branches List
 # ==========================================
@@ -467,16 +536,20 @@ def get_branches():
     cursor = conn.cursor()
     branches = []
     try:
-        # Distinct branches from a heavily populated table (e.g. LOANSBALANCEFILE_LOND2390)
+        # Fetch branches from BRANCH_NETWORK to include REGIONAL_OFFICE
         cursor.execute("""
-            SELECT DISTINCT BRANCH_CODE, BRANCH_NAME 
-            FROM LOANSBALANCEFILE_LOND2390
+            SELECT BRANCH_CODE, BRANCH_NAME, REGIONAL_OFFICE 
+            FROM BRANCH_NETWORK
             WHERE BRANCH_CODE IS NOT NULL AND BRANCH_CODE != ''
             ORDER BY BRANCH_CODE
         """)
         rows = cursor.fetchall()
         for row in rows:
-            branches.append({"code": row[0].strip(), "name": row[1].strip() if row[1] else "Unknown"})
+            branches.append({
+                "code": row[0].strip() if row[0] else "", 
+                "name": row[1].strip() if row[1] else "Unknown",
+                "region": row[2].strip() if row[2] else "Unknown Region"
+            })
     except Exception as e:
         import pyodbc
         if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):

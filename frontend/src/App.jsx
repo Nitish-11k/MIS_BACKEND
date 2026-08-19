@@ -4,14 +4,18 @@ import Login from './components/Login';
 import './index.css';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+
+  const handleLogout = () => {
+    setUser(null);
+  };
 
   return (
     <>
-      {isAuthenticated ? (
-        <Dashboard />
+      {user ? (
+        <Dashboard user={user} onLogout={handleLogout} />
       ) : (
-        <Login onLogin={() => setIsAuthenticated(true)} />
+        <Login onLogin={(userData) => setUser(userData)} />
       )}
     </>
   );

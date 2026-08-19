@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud, User } from 'lucide-react';
+import ProfileTab from './ProfileTab';
 import FilterBar from './FilterBar';
 import SmartModal from './SmartModal';
 import OverviewTab from './OverviewTab';
@@ -11,13 +12,13 @@ import ReportsTab from './ReportsTab';
 import UploadTab from './UploadTab';
 import BranchNetworkTab from './BranchNetworkTab';
 
-const Dashboard = () => {
+const Dashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   // Real data state
   const [branches, setBranches] = useState([]);
-  const [selectedBranch, setSelectedBranch] = useState('ALL');
+  const [selectedBranch, setSelectedBranch] = useState(user?.role === 'BRANCH' ? user.branch : 'ALL');
   const [selectedPeriod, setSelectedPeriod] = useState('30D');
   const [selectedProduct, setSelectedProduct] = useState('All Products');
   const [startDate, setStartDate] = useState('');
@@ -46,7 +47,19 @@ const Dashboard = () => {
   useEffect(() => {
     fetch('http://127.0.0.1:8000/api/branches')
       .then(res => res.json())
-      .then(data => { setBranches(Array.isArray(data) ? data : []); })
+      .then(data => { 
+        if (Array.isArray(data)) {
+          if (user?.role === 'RO') {
+            setBranches(data.filter(b => b.region === user.region));
+          } else if (user?.role === 'BRANCH') {
+            setBranches(data.filter(b => b.code === user.branch));
+          } else {
+            setBranches(data);
+          }
+        } else {
+          setBranches([]);
+        }
+      })
       .catch(console.error);
   }, []);
 
@@ -111,6 +124,7 @@ const Dashboard = () => {
             { id: 'compliance', label: 'Audit & Exceptions', icon: FileSignature },
             { id: 'reports', label: 'Reports & Accounts', icon: FileText },
             { id: 'upload', label: 'Data Sync', icon: UploadCloud },
+            { id: 'profile', label: 'My Profile', icon: User },
             { id: 'settings', label: 'Settings', icon: Settings },
           ].map(item => (
             <div 
@@ -141,17 +155,17 @@ const Dashboard = () => {
           ))}
         </div>
 
-        <div style={{ padding: isSidebarOpen ? '20px' : '20px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'flex-start' : 'center', gap: '12px' }}>
+        <div style={{ padding: isSidebarOpen ? '20px' : '20px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'flex-start' : 'center', gap: '12px', position: 'relative' }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-            RK
+            {user?.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
           </div>
           {isSidebarOpen && (
-            <div>
-              <div style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: '600' }}>Ramesh Kumar</div>
-              <div style={{ color: '#9CA3AF', fontSize: '11px', marginTop: '2px' }}>Chief MIS Officer</div>
-              <div style={{ color: '#10B981', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }}></div>
-                Online
+            <div style={{ flex: 1 }}>
+              <div style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }} title={user?.name}>{user?.name || 'User'}</div>
+              <div style={{ color: '#9CA3AF', fontSize: '11px', marginTop: '2px' }}>{user?.role === 'HO' ? 'Head Office' : user?.role === 'RO' ? 'Regional Office' : 'Branch'}</div>
+              <div style={{ color: '#10B981', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', cursor: 'pointer' }} onClick={onLogout}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EF4444' }}></div>
+                <span style={{ color: '#EF4444' }}>Logout</span>
               </div>
             </div>
           )}
@@ -193,6 +207,7 @@ const Dashboard = () => {
           selectedProduct={selectedProduct}
           setSelectedProduct={setSelectedProduct}
           setActiveModal={setActiveModal}
+          user={user}
         />
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -219,6 +234,7 @@ const Dashboard = () => {
           {activeTab === 'compliance' && <ComplianceTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
           {activeTab === 'reports' && <ReportsTab selectedBranch={selectedBranch} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
           {activeTab === 'upload' && <UploadTab />}
+          {activeTab === 'profile' && <ProfileTab user={user} onLogout={onLogout} />}
           {activeTab === 'settings' && <PlaceholderTab title="Settings" description="Configure system preferences, user roles, and UI themes." />}
         </div>
 

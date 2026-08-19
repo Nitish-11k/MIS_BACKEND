@@ -16,7 +16,8 @@ const FilterBar = ({
   setEndDate,
   selectedProduct,
   setSelectedProduct,
-  setActiveModal
+  setActiveModal,
+  user
 }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -195,9 +196,10 @@ const FilterBar = ({
             <select 
               value={localBranch} 
               onChange={(e) => setLocalBranch(e.target.value)}
-              style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', minWidth: '140px', cursor: 'pointer' }}
+              disabled={user?.role === 'BRANCH'}
+              style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', minWidth: '140px', cursor: user?.role === 'BRANCH' ? 'not-allowed' : 'pointer', opacity: user?.role === 'BRANCH' ? 0.7 : 1 }}
             >
-              <option value="ALL">All Branches</option>
+              {user?.role !== 'BRANCH' && <option value="ALL">All Branches</option>}
               {branches.map((b, i) => (
                 <option key={i} value={b.code}>{b.code} - {b.name}</option>
               ))}
