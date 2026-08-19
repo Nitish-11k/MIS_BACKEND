@@ -31,7 +31,6 @@ const Dashboard = () => {
   const [npaSummaryData, setNpaSummaryData] = useState([]);
   const [npaTrendData, setNpaTrendData] = useState([]);
   const [auditData, setAuditData] = useState([]);
-  const [npaTrendData, setNpaTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -86,7 +85,6 @@ const Dashboard = () => {
         setNpaSummaryData(Array.isArray(npaSummaryRes) ? npaSummaryRes : []);
         setNpaTrendData(Array.isArray(npaTrendRes) ? npaTrendRes : []);
         setAuditData(Array.isArray(auditRes) ? auditRes : []);
-        setNpaTrendData(Array.isArray(npaTrendRes) ? npaTrendRes : []);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -212,7 +210,6 @@ const Dashboard = () => {
               selectedPeriod={selectedPeriod}
               setActiveModal={setActiveModal}
               setActiveTab={setActiveTab}
-              selectedPeriod={selectedPeriod}
             />
           )}
           

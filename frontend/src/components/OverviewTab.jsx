@@ -22,7 +22,6 @@ const OverviewTab = ({
   selectedPeriod,
   setActiveModal,
   setActiveTab,
-  selectedPeriod,
 }) => {
   const sortedNpaData = useMemo(() => {
     if (!Array.isArray(branchNpaData)) return [];
