@@ -7,7 +7,7 @@ const InlineDataGrid = ({ title, endpoint, columns }) => {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/${endpoint}`)
+    fetch(`http://127.0.0.1:8000/api/${endpoint}`)
       .then(res => res.json())
       .then(d => {
         setData(Array.isArray(d) ? d : []);
@@ -56,3 +56,4 @@ const InlineDataGrid = ({ title, endpoint, columns }) => {
 };
 
 export default InlineDataGrid;
+

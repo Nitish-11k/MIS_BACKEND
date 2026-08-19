@@ -28,7 +28,7 @@ const generateSparklineData = (isPositive) => {
   return data;
 };
 
-const KPICard = ({ title, value, isCurrency = true, changePercent, changeType = 'positive', onClick }) => {
+const KPICard = ({ title, value, isCurrency = true, changePercent, changeType = 'positive', periodLabel = '30D', onClick }) => {
   const sparklineData = generateSparklineData(changeType === 'positive');
   const sparklineColor = changeType === 'positive' ? '#10B981' : '#EF4444';
 
@@ -70,7 +70,7 @@ const KPICard = ({ title, value, isCurrency = true, changePercent, changeType = 
                   {changeType === 'positive' ? '▲' : '▼'} {changePercent}%
                 </span>
               </div>
-              <div style={{ color: '#64748B', fontSize: '11px', marginTop: '4px' }}>Trend</div>
+              <div style={{ color: '#64748B', fontSize: '11px', marginTop: '4px' }}>vs last {periodLabel}</div>
             </div>
 
             <div style={{ width: '80px', height: '30px' }}>

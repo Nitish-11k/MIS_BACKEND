@@ -143,7 +143,7 @@ const DynamicDataGrid = ({
       }
 
       const response = await fetch(
-        `http://localhost:8000/api/data/${tableName}?${params.toString()}`
+        `http://127.0.0.1:8000/api/data/${tableName}?${params.toString()}`
       );
 
       if (!response.ok) {

@@ -8,6 +8,7 @@ import { ArrowRight, ShieldCheck } from 'lucide-react';
 
 const COLORS = ['#0F172A', '#D4AF37', '#10B981', '#8B5CF6', '#EF4444'];
 
+
 const OverviewTab = ({
   kpiData,
   accountMetrics,
@@ -21,6 +22,7 @@ const OverviewTab = ({
   selectedPeriod,
   setActiveModal,
   setActiveTab,
+  selectedPeriod,
 }) => {
   const sortedNpaData = useMemo(() => {
     if (!Array.isArray(branchNpaData)) return [];
@@ -40,12 +42,12 @@ const OverviewTab = ({
       
       {/* KPI ROW */}
       <div className="overview-kpi-grid">
-        <KPICard title="TOTAL ACCOUNTS" value={accountMetrics?.total || 0} isCurrency={false} onClick={() => setActiveModal('total')} />
-        <KPICard title="TOTAL DEPOSITS" value={kpiData?.total_deposits || 0} isCurrency={true} onClick={() => setActiveModal('deposits')} />
-        <KPICard title="TOTAL LOANS" value={kpiData?.total_loans || 0} isCurrency={true} onClick={() => setActiveModal('loans')} />
-        <KPICard title="TOTAL NPA" value={kpiData?.total_npa || 0} isCurrency={true} onClick={() => setActiveModal('npa')} />
-        <KPICard title="OPENED ACCOUNTS" value={accountMetrics?.opened || 0} isCurrency={false} onClick={() => setActiveModal('opened')} />
-        <KPICard title="CLOSED ACCOUNTS" value={accountMetrics?.closed || 0} isCurrency={false} onClick={() => setActiveModal('closed')} />
+        <KPICard title="TOTAL ACCOUNTS" value={accountMetrics?.total || 0} isCurrency={false} changePercent="7.2" changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('total')} />
+        <KPICard title="TOTAL DEPOSITS" value={kpiData?.total_deposits || 0} isCurrency={true} changePercent="8.3" changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('deposits')} />
+        <KPICard title="TOTAL LOANS" value={kpiData?.total_loans || 0} isCurrency={true} changePercent="6.1" changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('loans')} />
+        <KPICard title="TOTAL NPA" value={kpiData?.total_npa || 0} isCurrency={true} changePercent="12.6" changeType="negative" periodLabel={selectedPeriod} onClick={() => setActiveModal('npa')} />
+        <KPICard title="OPENED ACCOUNTS" value={accountMetrics?.opened || 0} isCurrency={false} changePercent="5.4" changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('opened')} />
+        <KPICard title="CLOSED ACCOUNTS" value={accountMetrics?.closed || 0} isCurrency={false} changePercent="3.7" changeType="negative" periodLabel={selectedPeriod} onClick={() => setActiveModal('closed')} />
       </div>
 
       {/* MIDDLE ROW (3 Charts) */}
@@ -80,7 +82,7 @@ const OverviewTab = ({
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={npaTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={trendData && trendData.length > 0 ? trendData : []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorNpa" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
@@ -190,9 +192,9 @@ const OverviewTab = ({
                   <td style={{ padding: '12px 8px', textAlign: 'center', color: '#0F172A' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                       <div style={{ width: '40px', height: '4px', backgroundColor: '#E2E8F0', borderRadius: '2px', overflow: 'hidden' }}>
-                        <div style={{ width: row.pct || '0%', height: '100%', backgroundColor: '#3B82F6' }}></div>
+                        <div style={{ width: `${row.pct || 0}%`, height: '100%', backgroundColor: '#3B82F6' }}></div>
                       </div>
-                      <span style={{ fontSize: '11px' }}>{row.pct}</span>
+                      <span style={{ fontSize: '11px' }}>{row.pct}%</span>
                     </div>
                   </td>
                   <td style={{ padding: '12px 8px', textAlign: 'right', color: row.isPositive ? '#10B981' : '#EF4444', fontWeight: '600' }}>

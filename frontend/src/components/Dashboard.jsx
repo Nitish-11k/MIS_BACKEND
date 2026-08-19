@@ -29,6 +29,7 @@ const Dashboard = () => {
   const [pieData, setPieData] = useState([]);
   const [trendData, setTrendData] = useState([]);
   const [npaSummaryData, setNpaSummaryData] = useState([]);
+  const [npaTrendData, setNpaTrendData] = useState([]);
   const [auditData, setAuditData] = useState([]);
   const [npaTrendData, setNpaTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +45,7 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/branches')
+    fetch('http://127.0.0.1:8000/api/branches')
       .then(res => res.json())
       .then(data => { setBranches(Array.isArray(data) ? data : []); })
       .catch(console.error);
@@ -65,15 +66,15 @@ const Dashboard = () => {
           kpiRes, accountRes, branchNpaRes,
           prodData, pieRes, trendDataRes, npaSummaryRes, auditRes, npaTrendRes
         ] = await Promise.all([
-          fetch(`http://localhost:8000/api/kpi-summary?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
-          fetch(`http://localhost:8000/api/account-metrics?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
-          fetch(`http://localhost:8000/api/npa-branch-wise?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
-          fetch(`http://localhost:8000/api/productwise-summary?branch_code=${selectedBranch}`).then(res => res.json()),
-          fetch(`http://localhost:8000/api/deposits-by-type?branch_code=${selectedBranch}`).then(res => res.json()),
-          fetch(`http://localhost:8000/api/trend-data?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
-          fetch(`http://localhost:8000/api/npa-summary?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => []),
-          fetch(`http://localhost:8000/api/audit-exceptions?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => []),
-          fetch(`http://localhost:8000/api/npa-trend?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => [])
+          fetch(`http://127.0.0.1:8000/api/kpi-summary?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/account-metrics?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/npa-branch-wise?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/productwise-summary?branch_code=${selectedBranch}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/deposits-by-type?branch_code=${selectedBranch}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/trend-data?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()),
+          fetch(`http://127.0.0.1:8000/api/npa-summary?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => []),
+          fetch(`http://127.0.0.1:8000/api/audit-exceptions?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => []),
+          fetch(`http://127.0.0.1:8000/api/npa-trend?branch_code=${selectedBranch}&${dateParams}`).then(res => res.json()).catch(() => [])
         ]);
 
         setKpiData(kpiRes || {});
@@ -83,6 +84,7 @@ const Dashboard = () => {
         setPieData(Array.isArray(pieRes) ? pieRes : []);
         setTrendData(Array.isArray(trendDataRes) ? trendDataRes : []);
         setNpaSummaryData(Array.isArray(npaSummaryRes) ? npaSummaryRes : []);
+        setNpaTrendData(Array.isArray(npaTrendRes) ? npaTrendRes : []);
         setAuditData(Array.isArray(auditRes) ? auditRes : []);
         setNpaTrendData(Array.isArray(npaTrendRes) ? npaTrendRes : []);
         setLoading(false);
@@ -210,6 +212,7 @@ const Dashboard = () => {
               selectedPeriod={selectedPeriod}
               setActiveModal={setActiveModal}
               setActiveTab={setActiveTab}
+              selectedPeriod={selectedPeriod}
             />
           )}
           
@@ -239,3 +242,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
