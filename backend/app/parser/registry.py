@@ -19,6 +19,7 @@ from app.parser.formats import maturity_list_depd0623, overdue_notice_lond2384, 
 from app.parser.formats import cheque_book_issue_order_casd0198, system_generated_transactions_lond2543
 from app.parser.formats import daily_branch_opend_accounts_nonwkit, audit_bgl_accounts_age_wise_break_up_gend0805
 from app.parser.formats import lien_marked_removal_depd0702, gl_outstanding_accnts_genm0808
+from app.parser.formats import loan_shadow_file
 
 REGISTRY = {
     "ACTCLS-01": account_closed_report.parse,
@@ -47,6 +48,9 @@ REGISTRY = {
     "GL1012-01": gend1012_prt.parse,
     "GL1012-02": gend1012_prt2.parse,
     "shadow_file": dep_shadow_file.parse,
+    "dep_shadow": dep_shadow_file.parse,
+    "loan_shadow_file": loan_shadow_file.parse,
+    "loan_shadow": loan_shadow_file.parse,
     "GL7043-01": glcc_wise_bal_rep.parse,
     "GL7043-02": glcc_wise_sum_rep.parse,
     "gend7041": debit_balance_in_income_account_gend7041.parse,

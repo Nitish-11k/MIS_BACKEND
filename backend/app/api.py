@@ -245,22 +245,12 @@ def scan_folder(req: UploadRequest):
     unsupported_files = set()
     
     for filepath in files_to_process:
-        # Read only first 50 lines to extract metadata quickly
-        import gzip
+        # Read only first 200 lines to extract metadata quickly
         lines = []
         try:
-            if filepath.endswith(".gz"):
-                with gzip.open(filepath, "rt", encoding="utf-8", errors="replace") as f:
-                    for _ in range(200):
-                        line = f.readline()
-                        if not line: break
-                        lines.append(line)
-            else:
-                with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                    for _ in range(200):
-                        line = f.readline()
-                        if not line: break
-                        lines.append(line)
+            for i, line in enumerate(read_report_lines(filepath)):
+                if i >= 200: break
+                lines.append(line + "\n")
         except Exception:
             pass
             
@@ -2012,7 +2002,7 @@ async def upload_file(background_tasks: BackgroundTasks, files: list[UploadFile]
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
 
 
 @app.get('/api/data/{table_name}')
@@ -2440,19 +2430,19 @@ def npa_summary(branch_code: Optional[str] = None, period: str = "ALL", start_da
         cursor = conn.cursor()
 
         branch_filter, filter_params = "", []
-        branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND")
+        branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND", "BRANCH_CODE")
         branch_filter = branch_sql
         filter_params.extend(branch_params)
 
-        date_filter, date_params = get_date_filter_sql(period, "NPA_STMT", "AND", start_date=start_date, end_date=end_date)
+        date_filter, date_params = get_date_filter_sql(period, "LIST_OF_NPA_ACCOUNTS", "AND", start_date=start_date, end_date=end_date)
         
         query = f"""
             SELECT 
-                PROD_DESCRIPTION as category,
-                SUM(BAL_OUTSTAND) as amount
-            FROM NPA_STMT
+                DESCRIPT as category,
+                SUM(TRY_CAST(REPLACE(ISNULL(OUTSTANDING, '0'), ',', '') AS FLOAT)) as amount
+            FROM LIST_OF_NPA_ACCOUNTS
             WHERE 1=1 {branch_filter} {date_filter}
-            GROUP BY PROD_DESCRIPTION
+            GROUP BY DESCRIPT
         """
         
         cursor.execute(query, filter_params + date_params)
@@ -2462,7 +2452,7 @@ def npa_summary(branch_code: Optional[str] = None, period: str = "ALL", start_da
         
         summary = []
         for row in rows:
-            amt_cr = (row.amount or 0) / 10000000
+            amt_cr = (row.amount or 0) / 100000
             pct = (row.amount / total_amount * 100) if total_amount > 0 else 0
             summary.append({
                 "category": row.category or "Unknown",
@@ -2476,6 +2466,11 @@ def npa_summary(branch_code: Optional[str] = None, period: str = "ALL", start_da
     except Exception as e:
         print(f"Error fetching npa summary: {e}")
         return []
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
 @app.get("/api/audit-exceptions")
 def audit_exceptions(branch_code: Optional[str] = None, period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
@@ -2692,21 +2687,21 @@ def get_npa_trend(branch_code: str = "ALL", period: str = "ALL", start_date: Opt
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    where_npa, params_npa = get_fact_date_filter_sql(period, "fact_npa_rbi_master", "WHERE", start_date=start_date, end_date=end_date)
+    where_npa, params_npa = get_date_filter_sql(period, "LIST_OF_NPA_ACCOUNTS", "WHERE", start_date=start_date, end_date=end_date)
     branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_npa.upper() else "WHERE", "BRANCH_CODE")
     where_npa += branch_sql
     params_npa.extend(branch_params)
         
-    where_loan, params_loan = get_fact_date_filter_sql(period, "fact_loan_master_daily", "WHERE", start_date=start_date, end_date=end_date)
+    where_loan, params_loan = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_SUM", "WHERE", start_date=start_date, end_date=end_date)
     branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_loan.upper() else "WHERE", "BRANCH_CODE")
     where_loan += branch_sql
     params_loan.extend(branch_params)
         
     try:
-        cursor.execute(f"SELECT CONVERT(VARCHAR, snapshot_date, 23), SUM(gross_npa_amount) FROM fact_npa_rbi_master {where_npa} GROUP BY CONVERT(VARCHAR, snapshot_date, 23)", params_npa)
+        cursor.execute(f"SELECT CONVERT(VARCHAR, CONVERT(date, PROC_DATE, 103), 23), SUM(TRY_CAST(REPLACE(ISNULL(OUTSTANDING, '0'), ',', '') AS FLOAT)) FROM LIST_OF_NPA_ACCOUNTS {where_npa} GROUP BY CONVERT(date, PROC_DATE, 103)", params_npa)
         npa_rows = cursor.fetchall()
         
-        cursor.execute(f"SELECT CONVERT(VARCHAR, snapshot_date, 23), SUM(outstanding_balance) FROM fact_loan_master_daily {where_loan} GROUP BY CONVERT(VARCHAR, snapshot_date, 23)", params_loan)
+        cursor.execute(f"SELECT CONVERT(VARCHAR, CONVERT(date, PROC_DATE, 103), 23), SUM(TRY_CAST(REPLACE(ISNULL(TOTAL_AMOUNT, '0'), ',', '') AS FLOAT)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM {where_loan} GROUP BY CONVERT(date, PROC_DATE, 103)", params_loan)
         loan_rows = cursor.fetchall()
         
         loans_by_date = {r[0]: r[1] for r in loan_rows if r[1]}
@@ -2717,15 +2712,19 @@ def get_npa_trend(branch_code: str = "ALL", period: str = "ALL", start_date: Opt
             npa_amt = r[1] or 0
             loan_amt = loans_by_date.get(dte, 0)
             pct = (npa_amt / loan_amt * 100) if loan_amt > 0 else 0
-            data.append({"name": dte, "value": round(pct, 2)})
+            # Also calculate exact NPA amount in lakhs
+            amt_lakhs = npa_amt / 100000
+            data.append({"name": dte, "value": round(pct, 2), "NPA": round(amt_lakhs, 2)})
             
         data = sorted(data, key=lambda x: x["name"])
-        data = pad_trend_dates(data, period)
     except Exception as e:
         print(f"Error fetching NPA trend: {e}")
         data = []
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except:
+            pass
         
     return data
 

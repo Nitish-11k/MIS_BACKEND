@@ -8,7 +8,12 @@ def read_report_lines(filepath):
     Only strips carriage returns and newlines, preserving internal spacing.
     """
     if filepath.endswith(".gz"):
-        opener = gzip.open
+        try:
+            with gzip.open(filepath, "rt", encoding="utf-8", errors="replace") as f:
+                f.readline()
+            opener = gzip.open
+        except (gzip.BadGzipFile, EOFError, OSError):
+            opener = open
     else:
         opener = open
 

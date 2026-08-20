@@ -23,6 +23,8 @@ const OverviewTab = ({
   setActiveModal,
   setActiveTab,
 }) => {
+  const [showNpaSummaryModal, setShowNpaSummaryModal] = useState(false);
+  
   const sortedNpaData = useMemo(() => {
     if (!Array.isArray(branchNpaData)) return [];
     return [...branchNpaData]
@@ -81,7 +83,7 @@ const OverviewTab = ({
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData && trendData.length > 0 ? trendData : []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={npaTrendData && npaTrendData.length > 0 ? npaTrendData : []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorNpa" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
@@ -161,7 +163,9 @@ const OverviewTab = ({
         <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)', overflowX: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>NPA Summary</h3>
-            <span style={{ fontSize: '12px', color: '#3B82F6', cursor: 'pointer', fontWeight: '600' }}>View Details</span>
+            {(npaSummaryData || []).length > 3 && (
+              <span onClick={() => setShowNpaSummaryModal(true)} style={{ fontSize: '12px', color: '#3B82F6', cursor: 'pointer', fontWeight: '600' }}>View Details</span>
+            )}
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
@@ -173,36 +177,39 @@ const OverviewTab = ({
               </tr>
             </thead>
             <tbody>
-              {(npaSummaryData || []).map((row, i) => (
-                <tr key={i} className="animate-slide-up" style={{ animationDelay: `${i * 0.1}s`, borderBottom: '1px solid #F1F5F9', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '12px 8px', color: '#0F172A', fontWeight: '500' }}>
-                    <span style={{ 
-                      padding: '4px 8px', 
-                      borderRadius: '4px', 
-                      backgroundColor: row.category.toLowerCase().includes('doubtful') || row.category.toLowerCase().includes('loss') ? '#FEE2E2' : '#EFF6FF',
-                      color: row.category.toLowerCase().includes('doubtful') || row.category.toLowerCase().includes('loss') ? '#991B1B' : '#1E40AF',
-                      fontSize: '11px',
-                      fontWeight: '600'
-                    }}>
-                      {row.category}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 8px', textAlign: 'center', color: '#0F172A' }}>{row.amount}</td>
-                  <td style={{ padding: '12px 8px', textAlign: 'center', color: '#0F172A' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <div style={{ width: '40px', height: '4px', backgroundColor: '#E2E8F0', borderRadius: '2px', overflow: 'hidden' }}>
-                        <div style={{ width: `${row.pct || 0}%`, height: '100%', backgroundColor: '#3B82F6' }}></div>
+              {(() => {
+                const sortedSummary = [...(npaSummaryData || [])].sort((a,b) => b.amount - a.amount);
+                return sortedSummary.slice(0, 3).map((row, i) => (
+                  <tr key={i} className="animate-slide-up" style={{ animationDelay: `${i * 0.1}s`, borderBottom: '1px solid #F1F5F9', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '12px 8px', color: '#0F172A', fontWeight: '500' }}>
+                      <span style={{ 
+                        padding: '4px 8px', 
+                        borderRadius: '4px', 
+                        backgroundColor: row.category.toLowerCase().includes('doubtful') || row.category.toLowerCase().includes('loss') ? '#FEE2E2' : '#EFF6FF',
+                        color: row.category.toLowerCase().includes('doubtful') || row.category.toLowerCase().includes('loss') ? '#991B1B' : '#1E40AF',
+                        fontSize: '11px',
+                        fontWeight: '600'
+                      }}>
+                        {row.category}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 8px', textAlign: 'center', color: '#0F172A' }}>{row.amount}</td>
+                    <td style={{ padding: '12px 8px', textAlign: 'center', color: '#0F172A' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <div style={{ width: '40px', height: '4px', backgroundColor: '#E2E8F0', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{ width: `${row.pct ? parseFloat(row.pct) : 0}%`, height: '100%', backgroundColor: '#3B82F6' }}></div>
+                        </div>
+                        <span style={{ fontSize: '11px' }}>{row.pct}</span>
                       </div>
-                      <span style={{ fontSize: '11px' }}>{row.pct}%</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px 8px', textAlign: 'right', color: row.isPositive ? '#10B981' : '#EF4444', fontWeight: '600' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', background: row.isPositive ? '#D1FAE5' : '#FEE2E2', padding: '4px 8px', borderRadius: '12px', display: 'inline-flex' }}>
-                      {row.isPositive ? '▲' : '▼'} {row.change}%
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={{ padding: '12px 8px', textAlign: 'right', color: row.isPositive ? '#10B981' : '#EF4444', fontWeight: '600' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', background: row.isPositive ? '#D1FAE5' : '#FEE2E2', padding: '4px 8px', borderRadius: '12px', display: 'inline-flex' }}>
+                        {row.isPositive ? '▲' : '▼'} {row.change}%
+                      </div>
+                    </td>
+                  </tr>
+                ));
+              })()}
               <tr>
                 <td colSpan="4" style={{ padding: '16px 8px 8px 8px', textAlign: 'center', color: '#64748B', fontSize: '11px' }}>Total values aggregated by backend</td>
               </tr>
@@ -257,6 +264,45 @@ const OverviewTab = ({
           </div>
         ))}
       </div>
+
+      {/* Detailed NPA Summary Modal */}
+      {showNpaSummaryModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.62)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }} onClick={() => setShowNpaSummaryModal(false)}>
+          <div style={{ width: '900px', maxWidth: '90vw', maxHeight: '80vh', background: '#F8FAFC', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.20)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', color: '#0F172A', fontWeight: '700' }}>NPA Summary Details</h2>
+                <div style={{ marginTop: '4px', fontSize: '12px', color: '#64748B' }}>Detailed breakdown of NPA categories</div>
+              </div>
+              <button onClick={() => setShowNpaSummaryModal(false)} style={{ background: '#F1F5F9', border: 'none', padding: '9px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#334155' }}>Close</button>
+            </div>
+            <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '16px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#0F172A', color: '#FFFFFF', fontSize: '13px', fontWeight: '600' }}>
+                      <th style={{ padding: '12px 16px', borderTopLeftRadius: '8px' }}>Category</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Amount (₹ Cr)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>% Share</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', borderTopRightRadius: '8px' }}>Trend (30D)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...(npaSummaryData || [])].sort((a,b) => b.amount - a.amount).map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #E2E8F0', transition: 'all 0.2s ease', backgroundColor: '#FFFFFF' }} onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = '#F8FAFC'; e.currentTarget.style.transform = 'translateY(-1px)';}} onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.transform = 'translateY(0)';}}>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#334155', fontWeight: '500' }}>{item.category}</td>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#334155', textAlign: 'right', fontWeight: '600' }}>₹ {item.amount.toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}</td>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#334155', textAlign: 'right' }}>{item.pct}</td>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', textAlign: 'right', color: item.isPositive ? '#10B981' : '#EF4444', fontWeight: '600' }}>{item.isPositive ? '▲' : '▼'} {item.change}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

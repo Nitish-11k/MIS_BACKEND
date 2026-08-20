@@ -37,12 +37,23 @@ def process_file(filepath):
             report_id = "GN7516_2"
     
     if report_id == "UNKNOWN" or report_id not in REGISTRY:
-        # Fallback to filename matching if report_id is unknown or not in registry
-        for k in sorted(REGISTRY.keys(), key=len, reverse=True):
-            if k.lower() in base_name:
-                report_id = k
-                print(f"Fallback matched {k} from filename {base_name}")
-                break
+        # Smart detection for shadow files based on line length
+        if "shadow" in base_name:
+            data_line = next((l for l in raw_lines if len(l.strip()) > 200), "")
+            if len(data_line) >= 700:
+                report_id = "shadow_file"
+                print(f"Smart matched shadow_file (dep) from line length {len(data_line)}")
+            elif len(data_line) >= 500:
+                report_id = "loan_shadow_file"
+                print(f"Smart matched loan_shadow_file from line length {len(data_line)}")
+
+        # Fallback to filename matching if report_id is still unknown
+        if report_id == "UNKNOWN" or report_id not in REGISTRY:
+            for k in sorted(REGISTRY.keys(), key=len, reverse=True):
+                if k.lower() in base_name:
+                    report_id = k
+                    print(f"Fallback matched {k} from filename {base_name}")
+                    break
 
     if report_id not in REGISTRY:
         print(f"SKIPPED (no parser yet): {filepath}  [REPORT_ID={report_id}]")
@@ -79,6 +90,8 @@ def process_file(filepath):
         primary_key_columns = ["S1_NO", "BRANCH_CODE", "PROC_DATE"]
     elif "ACCOUNT_NUM" in column_names:
         primary_key_columns = ["ACCOUNT_NUM", "BRANCH_CODE", "PROC_DATE"]
+    elif "ACCNO" in column_names:
+        primary_key_columns = ["ACCNO", "BRANCH_CODE", "PROC_DATE"]
         
     table = create_table_if_not_exists(table_name, column_names, primary_key_columns)
     
