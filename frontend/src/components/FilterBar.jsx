@@ -163,7 +163,14 @@ const FilterBar = ({
             {['7D', '30D', '90D', 'YTD', 'ALL'].map(p => (
               <div 
                 key={p} 
-                onClick={() => { setLocalPeriod(p); setLocalStartDate(''); setLocalEndDate(''); }}
+                onClick={() => { 
+                  setLocalPeriod(p); 
+                  setLocalStartDate(''); 
+                  setLocalEndDate('');
+                  setSelectedPeriod(p);
+                  setStartDate('');
+                  setEndDate('');
+                }}
                 style={{ 
                   padding: '8px 16px', 
                   fontSize: '13px', 
@@ -190,7 +197,11 @@ const FilterBar = ({
               value={localStartDate}
               onChange={(e) => {
                 setLocalStartDate(e.target.value);
-                if (e.target.value) setLocalPeriod('CUSTOM');
+                setStartDate(e.target.value);
+                if (e.target.value) {
+                  setLocalPeriod('CUSTOM');
+                  setSelectedPeriod('CUSTOM');
+                }
               }}
               style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', cursor: 'pointer', maxWidth: '110px' }}
             />
@@ -200,7 +211,11 @@ const FilterBar = ({
               value={localEndDate}
               onChange={(e) => {
                 setLocalEndDate(e.target.value);
-                if (e.target.value) setLocalPeriod('CUSTOM');
+                setEndDate(e.target.value);
+                if (e.target.value) {
+                  setLocalPeriod('CUSTOM');
+                  setSelectedPeriod('CUSTOM');
+                }
               }}
               style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', cursor: 'pointer', maxWidth: '110px' }}
             />
@@ -216,7 +231,9 @@ const FilterBar = ({
               value={localRegion} 
               onChange={(e) => {
                 setLocalRegion(e.target.value);
-                setLocalBranch('ALL'); // Reset branch when region changes
+                if (setSelectedRegion) setSelectedRegion(e.target.value);
+                setLocalBranch('ALL');
+                setSelectedBranch('ALL');
               }}
               disabled={user?.role !== 'HO'}
               style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', minWidth: '140px', cursor: user?.role !== 'HO' ? 'not-allowed' : 'pointer', opacity: user?.role !== 'HO' ? 0.7 : 1 }}
@@ -236,7 +253,10 @@ const FilterBar = ({
           <div style={{ display: 'flex', alignItems: 'center', background: '#FFFFFF', border: '1px solid #E2E8F0', padding: '8px 12px', borderRadius: '6px' }}>
             <select 
               value={localBranch} 
-              onChange={(e) => setLocalBranch(e.target.value)}
+              onChange={(e) => {
+                setLocalBranch(e.target.value);
+                setSelectedBranch(e.target.value);
+              }}
               disabled={user?.role === 'BRANCH'}
               style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', minWidth: '140px', cursor: user?.role === 'BRANCH' ? 'not-allowed' : 'pointer', opacity: user?.role === 'BRANCH' ? 0.7 : 1 }}
             >
@@ -254,7 +274,10 @@ const FilterBar = ({
           <div style={{ display: 'flex', alignItems: 'center', background: '#FFFFFF', border: '1px solid #E2E8F0', padding: '8px 12px', borderRadius: '6px' }}>
             <select 
               value={localProduct} 
-              onChange={(e) => setLocalProduct(e.target.value)}
+              onChange={(e) => {
+                setLocalProduct(e.target.value);
+                if (setSelectedProduct) setSelectedProduct(e.target.value);
+              }}
               style={{ outline: 'none', border: 'none', background: 'transparent', fontWeight: '500', color: '#0F172A', fontSize: '13px', minWidth: '140px', cursor: 'pointer' }}
             >
               <option value="All Products">All Products</option>
@@ -267,14 +290,6 @@ const FilterBar = ({
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
-          <button 
-            onClick={handleApplyFilters}
-            style={{ background: '#D4AF37', color: '#FFFFFF', border: 'none', padding: '8px 24px', borderRadius: '6px', fontWeight: '600', fontSize: '13px', cursor: 'pointer', transition: 'background 0.2s' }}
-            onMouseEnter={(e) => e.target.style.background = '#C09A2E'}
-            onMouseLeave={(e) => e.target.style.background = '#D4AF37'}
-          >
-            Apply Filters
-          </button>
           <button 
             onClick={handleReset}
             style={{ background: '#FFFFFF', color: '#0F172A', border: '1px solid #E2E8F0', padding: '8px 16px', borderRadius: '6px', fontWeight: '600', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.2s' }}

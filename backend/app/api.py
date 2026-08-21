@@ -568,11 +568,14 @@ def create_user(req: CreateUserRequest):
         conn.close()
 
 @app.delete("/api/users/{user_id}")
-def delete_user(user_id: int):
+def delete_user(user_id: str):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM USERS WHERE ID = ?", (user_id,))
+        if user_id.isdigit():
+            cursor.execute("DELETE FROM dbo.USERS WHERE ID = ?", (int(user_id),))
+        else:
+            cursor.execute("DELETE FROM dbo.USERS WHERE USERNAME = ?", (user_id,))
         conn.commit()
         return {"success": True, "message": "User deleted successfully"}
     except Exception as e:
