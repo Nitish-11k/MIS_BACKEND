@@ -37,6 +37,7 @@ const Dashboard = ({ user, onLogout }) => {
   const [npaSummaryData, setNpaSummaryData] = useState([]);
   const [npaTrendData, setNpaTrendData] = useState([]);
   const [auditData, setAuditData] = useState([]);
+  const [masterStats, setMasterStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -108,7 +109,7 @@ const Dashboard = ({ user, onLogout }) => {
 
         const [
           kpiRes, accountRes, branchNpaRes,
-          prodData, pieRes, trendDataRes, npaSummaryRes, auditRes, npaTrendRes
+          prodData, pieRes, trendDataRes, npaSummaryRes, auditRes, npaTrendRes, masterStatsRes
         ] = await Promise.all([
           fetch(`http://127.0.0.1:8000/api/kpi-summary?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()),
           fetch(`http://127.0.0.1:8000/api/account-metrics?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()),
@@ -118,7 +119,8 @@ const Dashboard = ({ user, onLogout }) => {
           fetch(`http://127.0.0.1:8000/api/trend-data?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()),
           fetch(`http://127.0.0.1:8000/api/npa-summary?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()).catch(() => []),
           fetch(`http://127.0.0.1:8000/api/audit-exceptions?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()).catch(() => []),
-          fetch(`http://127.0.0.1:8000/api/npa-trend?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()).catch(() => [])
+          fetch(`http://127.0.0.1:8000/api/npa-trend?branch_code=${apiBranchCode}&${dateParams}`).then(res => res.json()).catch(() => []),
+          fetch(`http://127.0.0.1:8000/api/master-stats?branch_code=${apiBranchCode}`).then(res => res.json()).catch(() => null)
         ]);
 
         setKpiData(kpiRes || {});
@@ -130,6 +132,7 @@ const Dashboard = ({ user, onLogout }) => {
         setNpaSummaryData(Array.isArray(npaSummaryRes) ? npaSummaryRes : []);
         setNpaTrendData(Array.isArray(npaTrendRes) ? npaTrendRes : []);
         setAuditData(Array.isArray(auditRes) ? auditRes : []);
+        setMasterStats(masterStatsRes || null);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -242,6 +245,7 @@ const Dashboard = ({ user, onLogout }) => {
               npaSummaryData={npaSummaryData}
               auditData={auditData}
               npaTrendData={npaTrendData}
+              masterStats={masterStats}
               selectedPeriod={selectedPeriod}
               setActiveModal={setActiveModal}
               setActiveTab={setActiveTab}

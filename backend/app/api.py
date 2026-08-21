@@ -629,6 +629,86 @@ def get_branches():
 # ==========================================
 # 0.5 Branch Comparison (NEW)
 # ==========================================
+
+@app.get("/api/master-stats")
+def get_master_stats(branch_code: str = "ALL"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    branch_sql, branch_params = get_branch_filter_sql(branch_code, "WHERE", "BRNO")
+    
+    stats = {
+        "deposits": {
+            "total_accounts": 0,
+            "total_amount": 0,
+            "active": 0,
+            "inactive": 0,
+            "dormant": 0,
+            "unclaimed": 0
+        },
+        "loans": {
+            "total_accounts": 0,
+            "total_amount": 0,
+            "active": 0,
+            "inactive": 0,
+            "dormant": 0,
+            "unclaimed": 0
+        }
+    }
+    
+    try:
+        # Deposits query
+        cursor.execute(f"""
+            SELECT 
+                COUNT(*) as total_acc,
+                SUM(TRY_CAST(REPLACE(ISNULL(CURRBAL, '0'), ',', '') AS FLOAT)) as total_bal,
+                SUM(CASE WHEN STATUS = '00' THEN 1 ELSE 0 END) as active_acc,
+                SUM(CASE WHEN STATUS = '07' THEN 1 ELSE 0 END) as inactive_acc,
+                SUM(CASE WHEN STATUS = '01' THEN 1 ELSE 0 END) as dormant_acc,
+                SUM(CASE WHEN STATUS NOT IN ('00', '07', '01') THEN 1 ELSE 0 END) as unclaimed_acc
+            FROM dep_shadow_file
+            {branch_sql}
+        """, branch_params)
+        dep_row = cursor.fetchone()
+        if dep_row:
+            stats["deposits"] = {
+                "total_accounts": dep_row[0] or 0,
+                "total_amount": dep_row[1] or 0,
+                "active": dep_row[2] or 0,
+                "inactive": dep_row[3] or 0,
+                "dormant": dep_row[4] or 0,
+                "unclaimed": dep_row[5] or 0
+            }
+            
+        # Loans query
+        cursor.execute(f"""
+            SELECT 
+                COUNT(*) as total_acc,
+                SUM(TRY_CAST(REPLACE(ISNULL(CURRBAL, '0'), ',', '') AS FLOAT)) as total_bal,
+                SUM(CASE WHEN STATUS IN ('08', '03') THEN 1 ELSE 0 END) as active_acc,
+                SUM(CASE WHEN STATUS = '40' THEN 1 ELSE 0 END) as inactive_acc,
+                SUM(CASE WHEN STATUS = '07' THEN 1 ELSE 0 END) as dormant_acc,
+                SUM(CASE WHEN STATUS NOT IN ('08', '03', '40', '07') THEN 1 ELSE 0 END) as unclaimed_acc
+            FROM loan_shadow_file
+            {branch_sql}
+        """, branch_params)
+        loan_row = cursor.fetchone()
+        if loan_row:
+            stats["loans"] = {
+                "total_accounts": loan_row[0] or 0,
+                "total_amount": loan_row[1] or 0,
+                "active": loan_row[2] or 0,
+                "inactive": loan_row[3] or 0,
+                "dormant": loan_row[4] or 0,
+                "unclaimed": loan_row[5] or 0
+            }
+    except Exception as e:
+        print(f"Error fetching master stats: {e}")
+    finally:
+        conn.close()
+        
+    return stats
+
 @app.get("/api/branch-comparison")
 def get_branch_comparison(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
     conn = get_db_connection()

@@ -49,10 +49,13 @@ def parse(raw_lines):
                 row["STATUS"] = parts[-1]
             elif len(parts) == 1:
                 # Could be just a rate or just a status
-                if parts[0].replace('.', '').replace('-', '').isdigit():
+                if "." in parts[0]:
                     row["INT_RATE"] = parts[0]
-                else:
+                elif parts[0].isdigit() and len(parts[0]) == 2:
                     row["STATUS"] = parts[0]
+                else:
+                    # If it's a single digit or something else without a dot, likely interest rate or garbage
+                    row["INT_RATE"] = parts[0]
         
         # skip lines that are obviously just leftover headers or empty
         if not row['ACCOUNT_NUMBER'].strip() or row['ACCOUNT_NUMBER'].startswith('NIL REPORT') or "TOTAL" in row['ACCOUNT_NUMBER'].upper():

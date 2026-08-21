@@ -19,6 +19,7 @@ const OverviewTab = ({
   npaSummaryData,
   auditData,
   npaTrendData,
+  masterStats,
   selectedPeriod,
   setActiveModal,
   setActiveTab,
@@ -43,12 +44,33 @@ const OverviewTab = ({
       
       {/* KPI ROW */}
       <div className="overview-kpi-grid">
-        <KPICard title="TOTAL ACCOUNTS" value={accountMetrics?.total || 0} isCurrency={false} changePercent={accountMetrics?.total ? "7.2" : "0"} changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('total')} />
-        <KPICard title="TOTAL DEPOSITS" value={kpiData?.total_deposits || 0} isCurrency={true} changePercent={kpiData?.total_deposits ? "8.3" : "0"} changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('deposits')} />
-        <KPICard title="TOTAL LOANS" value={kpiData?.total_loans || 0} isCurrency={true} changePercent={kpiData?.total_loans ? "6.1" : "0"} changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('loans')} />
-        <KPICard title="TOTAL NPA" value={kpiData?.total_npa || 0} isCurrency={true} changePercent={kpiData?.total_npa ? "12.6" : "0"} changeType="negative" periodLabel={selectedPeriod} onClick={() => setActiveModal('npa')} />
-        <KPICard title="OPENED ACCOUNTS" value={accountMetrics?.opened || 0} isCurrency={false} changePercent={accountMetrics?.opened ? "5.4" : "0"} changeType="positive" periodLabel={selectedPeriod} onClick={() => setActiveModal('opened')} />
-        <KPICard title="CLOSED ACCOUNTS" value={accountMetrics?.closed || 0} isCurrency={false} changePercent={accountMetrics?.closed ? "3.7" : "0"} changeType="negative" periodLabel={selectedPeriod} onClick={() => setActiveModal('closed')} />
+        <KPICard 
+          title="TOTAL ACCOUNTS" 
+          value={(masterStats?.deposits?.total_accounts || 0) + (masterStats?.loans?.total_accounts || 0)} 
+          isCurrency={false} 
+          changePercent="0" 
+          changeType="neutral" 
+          periodLabel="Master Data" 
+          onClick={() => setActiveModal('total')} 
+        />
+        <KPICard 
+          title="TOTAL DEPOSITS" 
+          value={masterStats?.deposits?.total_amount || 0} 
+          isCurrency={true} 
+          changePercent="0" 
+          changeType="neutral" 
+          periodLabel="Master Data" 
+          onClick={() => setActiveModal('deposits')} 
+        />
+        <KPICard 
+          title="TOTAL LOANS" 
+          value={Math.abs(masterStats?.loans?.total_amount || 0)} 
+          isCurrency={true} 
+          changePercent="0" 
+          changeType="neutral" 
+          periodLabel="Master Data" 
+          onClick={() => setActiveModal('loans')} 
+        />
       </div>
 
       {/* MIDDLE ROW (3 Charts) */}
@@ -239,6 +261,84 @@ const OverviewTab = ({
         </div>
 
       </div>
+
+      {/* MASTER DATA TABLES */}
+      {masterStats && (
+        <div className="overview-npa-summary-grid" style={{ gap: '24px', marginBottom: '24px' }}>
+          {/* Deposit Master Table */}
+          <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Deposit Master Snapshot</h3>
+              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>dep_shadow_file</span>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.total_accounts?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Deposits</td>
+                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>₹ {(masterStats.deposits?.total_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Active Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#10B981', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.active?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Inactive Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#F59E0B', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.inactive?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Dormant Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#6366F1', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.dormant?.toLocaleString() || 0}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Unclaimed Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#EF4444', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.unclaimed?.toLocaleString() || 0}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Loan Master Table */}
+          <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Loan Master Snapshot</h3>
+              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>loan_shadow_file</span>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.total_accounts?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Loans</td>
+                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>₹ {(masterStats.loans?.total_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Active Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#10B981', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.active?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Closed/Inactive Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#F59E0B', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.inactive?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>NPA / Dormant</td>
+                  <td style={{ padding: '10px 8px', color: '#EF4444', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.dormant?.toLocaleString() || 0}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Other Statuses</td>
+                  <td style={{ padding: '10px 8px', color: '#6366F1', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.unclaimed?.toLocaleString() || 0}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      )}
 
       {/* QUICK LINKS FOOTER */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '16px 20px', boxShadow: 'var(--shadow-premium)', overflowX: 'auto' }}>
