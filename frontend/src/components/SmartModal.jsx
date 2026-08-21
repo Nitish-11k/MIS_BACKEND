@@ -256,6 +256,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [drillDownRegion, setDrillDownRegion] = useState(null);
 
   const config = useMemo(() => {
     switch (type) {
@@ -325,7 +326,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
 
       try {
         const params = new URLSearchParams({
-          branch_code: branchCode || 'ALL',
+          branch_code: drillDownRegion ? `REGION:${drillDownRegion}` : (branchCode || 'ALL'),
         });
         if (startDate && endDate) {
           params.append('start_date', startDate);
@@ -527,9 +528,20 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
                 fontSize: '20px',
                 fontWeight: '700',
                 color: '#0F172A',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
               }}
             >
-              {config.title}
+              {drillDownRegion && (
+                <button 
+                  onClick={() => setDrillDownRegion(null)}
+                  style={{ background: '#E2E8F0', border: 'none', borderRadius: '6px', padding: '4px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  ← Back to Regions
+                </button>
+              )}
+              {config.title} {drillDownRegion && ` - ${drillDownRegion}`}
             </div>
 
             <div
@@ -708,6 +720,12 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
                             name={config.amountLabel}
                             fill="#15559F"
                             radius={[0, 5, 5, 0]}
+                            onClick={(data) => {
+                              if (branchCode === 'ALL' && !drillDownRegion && data && data.name) {
+                                setDrillDownRegion(data.name);
+                              }
+                            }}
+                            style={{ cursor: (branchCode === 'ALL' && !drillDownRegion) ? 'pointer' : 'default' }}
                           />
                         </BarChart>
                       </ResponsiveContainer>
@@ -831,6 +849,12 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
                       striped
                       dense
                       customStyles={customTableStyles}
+                      onRowClicked={(row) => {
+                        if (branchCode === 'ALL' && !drillDownRegion && row && row.name) {
+                          setDrillDownRegion(row.name);
+                        }
+                      }}
+                      pointerOnHover={branchCode === 'ALL' && !drillDownRegion}
                       noDataComponent={
                         <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#94A3B8', gap: '12px' }}>
                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
