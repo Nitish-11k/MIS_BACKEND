@@ -25,6 +25,7 @@ const OverviewTab = ({
   setActiveTab,
 }) => {
   const [showNpaSummaryModal, setShowNpaSummaryModal] = useState(false);
+  const [showOtherStatuses, setShowOtherStatuses] = useState(false);
   
   const sortedNpaData = useMemo(() => {
     if (!Array.isArray(branchNpaData)) return [];
@@ -282,21 +283,41 @@ const OverviewTab = ({
                   <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>₹ {(masterStats.deposits?.total_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Active Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#10B981', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.active?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Inactive Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#F59E0B', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.inactive?.toLocaleString() || 0}</td>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Active (Open) Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#10B981', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Open?.toLocaleString() || 0}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
                   <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Dormant Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#6366F1', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.dormant?.toLocaleString() || 0}</td>
+                  <td style={{ padding: '10px 8px', color: '#6366F1', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Dormant?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Unclaimed Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#F59E0B', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Unclaimed?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Inoperative Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#F97316', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Inoperative?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Closed Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#EF4444', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Closed?.toLocaleString() || 0}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Inactive Accounts</td>
+                  <td style={{ padding: '10px 8px', color: '#8B5CF6', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Inactive?.toLocaleString() || 0}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Unclaimed Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#EF4444', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.unclaimed?.toLocaleString() || 0}</td>
+                  <td style={{ padding: '10px 8px', color: '#3B82F6', fontWeight: '500', cursor: 'pointer' }} onClick={() => setShowOtherStatuses(!showOtherStatuses)}>
+                    Other Statuses {showOtherStatuses ? '▲' : '▼'}
+                  </td>
+                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Others?.count?.toLocaleString() || 0}</td>
                 </tr>
+                {showOtherStatuses && masterStats.deposits?.statuses?.Others?.codes?.map((other, idx) => (
+                  <tr key={idx} style={{ backgroundColor: '#F8FAFC' }}>
+                    <td style={{ padding: '6px 8px 6px 24px', color: '#64748B', fontSize: '12px' }}>Code: "{other.code || 'Empty'}"</td>
+                    <td style={{ padding: '6px 8px', color: '#64748B', fontSize: '12px', textAlign: 'right' }}>{other.count.toLocaleString()}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -317,22 +338,12 @@ const OverviewTab = ({
                   <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Loans</td>
                   <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>₹ {(masterStats.loans?.total_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
                 </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Active Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#10B981', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.active?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Closed/Inactive Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#F59E0B', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.inactive?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>NPA / Dormant</td>
-                  <td style={{ padding: '10px 8px', color: '#EF4444', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.dormant?.toLocaleString() || 0}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Other Statuses</td>
-                  <td style={{ padding: '10px 8px', color: '#6366F1', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.unclaimed?.toLocaleString() || 0}</td>
-                </tr>
+                {masterStats.loans?.schemes?.slice(0, 5).map((scheme, idx) => (
+                  <tr key={idx} style={{ borderBottom: idx === 4 || idx === masterStats.loans.schemes.length - 1 ? 'none' : '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>{scheme.scheme}</td>
+                    <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>₹ {scheme.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

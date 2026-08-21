@@ -641,67 +641,87 @@ def get_master_stats(branch_code: str = "ALL"):
         "deposits": {
             "total_accounts": 0,
             "total_amount": 0,
-            "active": 0,
-            "inactive": 0,
-            "dormant": 0,
-            "unclaimed": 0
+            "statuses": {}
         },
         "loans": {
             "total_accounts": 0,
             "total_amount": 0,
-            "active": 0,
-            "inactive": 0,
-            "dormant": 0,
-            "unclaimed": 0
+            "schemes": []
         }
     }
     
     try:
         # Deposits query
         cursor.execute(f"""
-            SELECT 
-                COUNT(*) as total_acc,
-                SUM(TRY_CAST(REPLACE(ISNULL(CURRBAL, '0'), ',', '') AS FLOAT)) as total_bal,
-                SUM(CASE WHEN STATUS = '00' THEN 1 ELSE 0 END) as active_acc,
-                SUM(CASE WHEN STATUS = '07' THEN 1 ELSE 0 END) as inactive_acc,
-                SUM(CASE WHEN STATUS = '01' THEN 1 ELSE 0 END) as dormant_acc,
-                SUM(CASE WHEN STATUS NOT IN ('00', '07', '01') THEN 1 ELSE 0 END) as unclaimed_acc
+            SELECT STATUS, COUNT(*), SUM(TRY_CAST(REPLACE(ISNULL(CURRBAL, '0'), ',', '') AS FLOAT))
             FROM dep_shadow_file
             {branch_sql}
+            GROUP BY STATUS
         """, branch_params)
-        dep_row = cursor.fetchone()
-        if dep_row:
-            stats["deposits"] = {
-                "total_accounts": dep_row[0] or 0,
-                "total_amount": dep_row[1] or 0,
-                "active": dep_row[2] or 0,
-                "inactive": dep_row[3] or 0,
-                "dormant": dep_row[4] or 0,
-                "unclaimed": dep_row[5] or 0
+        dep_rows = cursor.fetchall()
+        
+        status_map = {
+            '00': 'Open',
+            '01': 'Dormant',
+            '02': 'Unclaimed',
+            '03': 'Inoperative',
+            '07': 'Closed',
+            '11': 'Inactive'
+        }
+        
+        dep_statuses = {
+            'Open': 0,
+            'Dormant': 0,
+            'Unclaimed': 0,
+            'Inoperative': 0,
+            'Closed': 0,
+            'Inactive': 0,
+            'Others': {
+                'count': 0,
+                'codes': []
             }
+        }
+        
+        for row in dep_rows:
+            status_code = (row[0] or '').strip()
+            count = row[1] or 0
+            amount = row[2] or 0
+            stats['deposits']['total_accounts'] += count
+            stats['deposits']['total_amount'] += amount
             
+            if status_code in status_map:
+                dep_statuses[status_map[status_code]] += count
+            else:
+                dep_statuses['Others']['count'] += count
+                dep_statuses['Others']['codes'].append({'code': status_code, 'count': count})
+                
+        stats['deposits']['statuses'] = dep_statuses
+        
         # Loans query
         cursor.execute(f"""
-            SELECT 
-                COUNT(*) as total_acc,
-                SUM(TRY_CAST(REPLACE(ISNULL(CURRBAL, '0'), ',', '') AS FLOAT)) as total_bal,
-                SUM(CASE WHEN STATUS IN ('08', '03') THEN 1 ELSE 0 END) as active_acc,
-                SUM(CASE WHEN STATUS = '40' THEN 1 ELSE 0 END) as inactive_acc,
-                SUM(CASE WHEN STATUS = '07' THEN 1 ELSE 0 END) as dormant_acc,
-                SUM(CASE WHEN STATUS NOT IN ('08', '03', '40', '07') THEN 1 ELSE 0 END) as unclaimed_acc
+            SELECT ISNULL(SCHEMEDESC, 'Unknown Scheme') as scheme_name, COUNT(*), SUM(TRY_CAST(REPLACE(ISNULL(CURRBAL, '0'), ',', '') AS FLOAT))
             FROM loan_shadow_file
             {branch_sql}
+            GROUP BY ISNULL(SCHEMEDESC, 'Unknown Scheme')
+            ORDER BY COUNT(*) DESC
         """, branch_params)
-        loan_row = cursor.fetchone()
-        if loan_row:
-            stats["loans"] = {
-                "total_accounts": loan_row[0] or 0,
-                "total_amount": loan_row[1] or 0,
-                "active": loan_row[2] or 0,
-                "inactive": loan_row[3] or 0,
-                "dormant": loan_row[4] or 0,
-                "unclaimed": loan_row[5] or 0
-            }
+        loan_rows = cursor.fetchall()
+        
+        schemes = []
+        for row in loan_rows:
+            count = row[1] or 0
+            amount = row[2] or 0
+            stats['loans']['total_accounts'] += count
+            stats['loans']['total_amount'] += amount
+            schemes.append({
+                'scheme': row[0][:25],
+                'count': count,
+                'amount': abs(amount)
+            })
+            
+        stats['loans']['total_amount'] = abs(stats['loans']['total_amount'])
+        stats['loans']['schemes'] = schemes
+        
     except Exception as e:
         print(f"Error fetching master stats: {e}")
     finally:
