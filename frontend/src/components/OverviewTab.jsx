@@ -8,6 +8,13 @@ import { ArrowRight, ShieldCheck } from 'lucide-react';
 
 const COLORS = ['#0F172A', '#D4AF37', '#10B981', '#8B5CF6', '#EF4444'];
 
+const formatCurrency = (val) => {
+  if (val === null || val === undefined) return '0';
+  const num = Number(val) / 1000;
+  if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹ ${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+};
+
 
 const OverviewTab = ({
   kpiData,
@@ -21,6 +28,7 @@ const OverviewTab = ({
   npaTrendData,
   masterStats,
   selectedPeriod,
+  selectedBranch,
   setActiveModal,
   setActiveTab,
 }) => {
@@ -32,7 +40,7 @@ const OverviewTab = ({
     return [...branchNpaData]
       .map(item => ({ name: (item.BRANCH_NAME || item.name || '').substring(0, 15), value: Number(item.NPA) || 0 }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
+      .slice(0, 12);
   }, [branchNpaData]);
 
   const totalBusiness = useMemo(() => {
@@ -77,47 +85,51 @@ const OverviewTab = ({
       {/* MIDDLE ROW (3 Charts) */}
       <div className="overview-npa-summary-grid" style={{ gap: '24px', marginBottom: '24px' }}>
         
-        {/* Deposits vs Loans Trend */}
+        {/* Deposit Trend */}
         <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Deposits vs Loans Trend</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Deposit Trend</h3>
             <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>{selectedPeriod}</span>
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barChartData && barChartData.length > 0 ? barChartData : trendData || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <AreaChart data={trendData && trendData.length > 0 ? trendData : []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorDeposits" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
-                <Tooltip cursor={{ fill: '#F8FAFC' }} />
-                <Legend verticalAlign="top" height={36} iconType="rect" wrapperStyle={{ fontSize: '12px' }} />
-                <Bar dataKey="Deposits" name="Deposits" fill="#0F172A" barSize={12} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Loans" name="Loans" fill="#D4AF37" barSize={12} radius={[2, 2, 0, 0]} />
-              </BarChart>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(val) => { const d = new Date(val); return isNaN(d) ? val : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={formatCurrency} />
+                <Tooltip cursor={{ stroke: '#E2E8F0', strokeWidth: 1, strokeDasharray: '4 4' }} formatter={(val) => formatCurrency(val)} labelFormatter={(val) => { const d = new Date(val); return isNaN(d) ? val : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                <Area type="monotone" dataKey="Deposits" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorDeposits)" activeDot={{ r: 6, fill: '#10B981', stroke: '#fff', strokeWidth: 2 }} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* NPA Trend (%) */}
+        {/* Loan Trend */}
         <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>NPA Trend (%)</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Loan Trend</h3>
             <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>{selectedPeriod}</span>
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={npaTrendData && npaTrendData.length > 0 ? npaTrendData : []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={trendData && trendData.length > 0 ? trendData : []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorNpa" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                  <linearGradient id="colorLoans" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(val) => val+"%"} />
-                <Tooltip />
-                <Area type="monotone" dataKey="value" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorNpa)" activeDot={{ r: 6, fill: '#EF4444', stroke: '#fff', strokeWidth: 2 }} dot={{ r: 4, fill: '#EF4444', strokeWidth: 0 }} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(val) => { const d = new Date(val); return isNaN(d) ? val : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={formatCurrency} />
+                <Tooltip cursor={{ stroke: '#E2E8F0', strokeWidth: 1, strokeDasharray: '4 4' }} formatter={(val) => formatCurrency(val)} labelFormatter={(val) => { const d = new Date(val); return isNaN(d) ? val : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                <Area type="monotone" dataKey="Loans" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorLoans)" activeDot={{ r: 6, fill: '#3B82F6', stroke: '#fff', strokeWidth: 2 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -126,18 +138,18 @@ const OverviewTab = ({
         {/* Top 5 Branches */}
         <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Top 5 Branches by NPA</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Top {selectedBranch === 'ALL' ? 'Regional Offices' : 'Branches'} by NPA</h3>
             <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>{selectedPeriod}</span>
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sortedNpaData && sortedNpaData.length > 0 ? sortedNpaData : []} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={formatCurrency} />
                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#0F172A', fontWeight: 500 }} width={100} />
-                <Tooltip cursor={{ fill: '#F8FAFC' }} />
+                <Tooltip cursor={{ fill: '#F8FAFC' }} formatter={(val) => formatCurrency(val)} />
                 <Bar dataKey="value" fill="#0F172A" barSize={12} radius={[0, 4, 4, 0]}>
-                  <LabelList dataKey="value" position="right" style={{ fontSize: '11px', fill: '#64748B' }} />
+                  <LabelList dataKey="value" position="right" style={{ fontSize: '11px', fill: '#64748B' }} formatter={(val) => formatCurrency(val)} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -159,7 +171,12 @@ const OverviewTab = ({
                   <Pie data={pieData && pieData.length > 0 ? pieData : [{name: 'Empty', value: 100}]} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none">
                     {(pieData && pieData.length > 0 ? pieData : [{name: 'Empty', value: 100}]).map((entry, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip 
+                    formatter={(value) => {
+                      if (!totalBusiness) return '0%';
+                      return `${((value / totalBusiness) * 100).toFixed(1)}%`;
+                    }} 
+                  />
                 </PieChart>
               </ResponsiveContainer>
               <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
@@ -194,7 +211,7 @@ const OverviewTab = ({
             <thead>
               <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
                 <th style={{ textAlign: 'left', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>Category</th>
-                <th style={{ textAlign: 'center', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>Amount (Cr)</th>
+                <th style={{ textAlign: 'center', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>Amount</th>
                 <th style={{ textAlign: 'center', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>% of Loans</th>
                 <th style={{ textAlign: 'right', padding: '12px 8px', color: '#64748B', fontWeight: '600' }}>Change (vs last 30D)</th>
               </tr>
@@ -263,94 +280,6 @@ const OverviewTab = ({
 
       </div>
 
-      {/* MASTER DATA TABLES */}
-      {masterStats && (
-        <div className="overview-npa-summary-grid" style={{ gap: '24px', marginBottom: '24px' }}>
-          {/* Deposit Master Table */}
-          <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Deposit Master Snapshot</h3>
-              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>dep_shadow_file</span>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.total_accounts?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Deposits</td>
-                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>₹ {(masterStats.deposits?.total_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Active (Open) Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#10B981', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Open?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Dormant Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#6366F1', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Dormant?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Unclaimed Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#F59E0B', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Unclaimed?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Inoperative Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#F97316', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Inoperative?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Closed Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#EF4444', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Closed?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Inactive Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#8B5CF6', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Inactive?.toLocaleString() || 0}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '10px 8px', color: '#3B82F6', fontWeight: '500', cursor: 'pointer' }} onClick={() => setShowOtherStatuses(!showOtherStatuses)}>
-                    Other Statuses {showOtherStatuses ? '▲' : '▼'}
-                  </td>
-                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>{masterStats.deposits?.statuses?.Others?.count?.toLocaleString() || 0}</td>
-                </tr>
-                {showOtherStatuses && masterStats.deposits?.statuses?.Others?.codes?.map((other, idx) => (
-                  <tr key={idx} style={{ backgroundColor: '#F8FAFC' }}>
-                    <td style={{ padding: '6px 8px 6px 24px', color: '#64748B', fontSize: '12px' }}>Code: "{other.code || 'Empty'}"</td>
-                    <td style={{ padding: '6px 8px', color: '#64748B', fontSize: '12px', textAlign: 'right' }}>{other.count.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Loan Master Table */}
-          <div className="card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: 'var(--shadow-premium)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 }}>Loan Master Snapshot</h3>
-              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '600' }}>loan_shadow_file</span>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Accounts</td>
-                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>{masterStats.loans?.total_accounts?.toLocaleString() || 0}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>Total Loans</td>
-                  <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>₹ {(masterStats.loans?.total_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
-                </tr>
-                {masterStats.loans?.schemes?.slice(0, 5).map((scheme, idx) => (
-                  <tr key={idx} style={{ borderBottom: idx === 4 || idx === masterStats.loans.schemes.length - 1 ? 'none' : '1px solid #F1F5F9' }}>
-                    <td style={{ padding: '10px 8px', color: '#64748B', fontWeight: '500' }}>{scheme.scheme}</td>
-                    <td style={{ padding: '10px 8px', color: '#0F172A', fontWeight: '600', textAlign: 'right' }}>₹ {scheme.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      )}
-
       {/* QUICK LINKS FOOTER */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '16px 20px', boxShadow: 'var(--shadow-premium)', overflowX: 'auto' }}>
         <h4 style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', margin: 0, whiteSpace: 'nowrap' }}>Quick Links</h4>
@@ -393,7 +322,7 @@ const OverviewTab = ({
                   <thead>
                     <tr style={{ backgroundColor: '#0F172A', color: '#FFFFFF', fontSize: '13px', fontWeight: '600' }}>
                       <th style={{ padding: '12px 16px', borderTopLeftRadius: '8px' }}>Category</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Amount (₹ Cr)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Amount (₹)</th>
                       <th style={{ padding: '12px 16px', textAlign: 'right' }}>% Share</th>
                       <th style={{ padding: '12px 16px', textAlign: 'right', borderTopRightRadius: '8px' }}>Trend (30D)</th>
                     </tr>

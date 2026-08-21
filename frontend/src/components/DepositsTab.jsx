@@ -6,10 +6,10 @@ import DynamicVisualizer from './DynamicVisualizer';
 const COLORS = ['#0B1F3A', '#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6'];
 
 const formatCurrency = (val) => {
-  if (!val) return '₹ 0.00';
-  if (val >= 10000000) return `₹ ${(val / 10000000).toFixed(2)} Cr`;
-  if (val >= 100000) return `₹ ${(val / 100000).toFixed(2)} L`;
-  return `₹ ${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  if (val === null || val === undefined) return '0';
+  const num = Number(val) / 1000;
+  if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹ ${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
 
 const KPICard = ({ title, value, isCurrency = true, changePercent, changeType, onClick }) => (
@@ -139,7 +139,7 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
     if (!activeOthersModal) return null;
     const sorted = [...activeOthersModal].sort((a, b) => (b.value || 0) - (a.value || 0));
     const othersTotal = sorted.reduce((sum, item) => sum + (item.value || 0), 0);
-    const top5 = sorted.slice(0, 5).map((p, i) => ({
+    const top12 = sorted.slice(0, 12).map((p, i) => ({
       name: (p.name || 'Unknown').substring(0, 22),
       value: p.value || 0,
       fill: COLORS[i % COLORS.length]
@@ -171,17 +171,17 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
 
           <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>
             <div style={{ width: '340px', flexShrink: 0, background: '#F8FAFC', borderRadius: '12px', padding: '16px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: '#475569' }}>Top 5 by Value</h4>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: '#475569' }}>Top Products by Value</h4>
               <div style={{ flex: 1 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={top5} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <BarChart data={top12} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
-                    <XAxis type="number" tickFormatter={(val) => `${(val/100000).toFixed(0)}L`} tick={{ fill: '#64748B', fontSize: 10 }} />
+                    <XAxis type="number" tickFormatter={formatCurrency} tick={{ fill: '#64748B', fontSize: 10 }} />
                     <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 10, fontWeight: 500 }} width={130} interval={0} />
                     <Tooltip cursor={{ fill: '#F1F5F9' }} formatter={(value) => [formatCurrency(value), 'Amount']}
                       contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }} />
                     <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={20}>
-                      {top5.map((entry, index) => (
+                      {top12.map((entry, index) => (
                         <Cell key={`bar-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Bar>
@@ -294,7 +294,10 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                     />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Tooltip formatter={(value) => {
+                  const total = productDonutDataWithPercent.reduce((acc, curr) => acc + (curr.value || 0), 0);
+                  return total ? `${((value / total) * 100).toFixed(1)}%` : '0%';
+                }} />
               </PieChart>
             </ResponsiveContainer>
             
@@ -315,7 +318,7 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
 
         {/* Bar Chart: Top Branches */}
         <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', border: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#111827' }}>Top Branches by Deposits</h3>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#111827' }}>Top {selectedBranch === 'ALL' ? 'Regional Offices' : 'Branches'} by Deposits</h3>
           <div style={{ flex: 1, minHeight: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topBranchesData} margin={{ top: 10, right: 10, left: 20, bottom: 40 }}>
@@ -329,7 +332,7 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                   interval={0}
                 />
                 <YAxis 
-                  tickFormatter={(val) => `₹${(val/100000).toFixed(0)}L`}
+                  tickFormatter={formatCurrency}
                   tick={{ fontSize: 11, fill: '#6B7280' }} 
                 />
                 <Tooltip 
@@ -472,14 +475,14 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                   <LineChart data={displayedModalData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                     <XAxis dataKey="name" angle={-90} textAnchor="end" height={80} tick={{ fill: '#64748B', fontSize: 9 }} interval={0} />
-                    <YAxis tickFormatter={(val) => `₹${(val/10000000).toFixed(2)}Cr`} tick={{ fill: '#475569', fontSize: 11 }} />
+                    <YAxis tickFormatter={formatCurrency} tick={{ fill: '#475569', fontSize: 11 }} />
                     <Tooltip cursor={{ fill: '#F8FAFC' }} formatter={(value) => [formatCurrency(value), "Deposits"]} />
                     <Line type="monotone" dataKey="value" stroke="#10B981" strokeWidth={2} dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 6 }} />
                   </LineChart>
                 ) : (
                   <BarChart data={displayedModalData} layout="vertical" margin={{ top: 5, right: 30, left: 120, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E2E8F0" />
-                    <XAxis type="number" tickFormatter={(val) => `₹${(val/10000000).toFixed(2)}Cr`} tick={{ fill: '#64748B', fontSize: 12 }} />
+                    <XAxis type="number" tickFormatter={formatCurrency} tick={{ fill: '#64748B', fontSize: 12 }} />
                     <YAxis type="category" dataKey="name" tick={{ fill: '#475569', fontSize: 11, fontWeight: 500 }} width={120} interval={0} />
                     <Tooltip 
                       cursor={{ fill: '#F8FAFC' }}

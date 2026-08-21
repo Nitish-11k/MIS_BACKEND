@@ -14,7 +14,19 @@ const CustomTooltip = ({ active, payload, label }) => {
           const name = String(p.name || p.dataKey || '').toLowerCase();
           const isCount = name.includes('count') || name.includes('accounts') || name.includes('txns') || name.includes('loans') || name.includes('deposits');
           const prefix = isCount ? '' : '₹ ';
-          const formattedValue = typeof p.value === 'number' ? prefix + new Intl.NumberFormat('en-IN').format(p.value) : p.value;
+          let formattedValue = p.value;
+          if (typeof p.value === 'number') {
+            if (isCount) {
+              formattedValue = p.value.toLocaleString();
+            } else {
+              const num = p.value / 1000;
+              if (Math.abs(num) >= 10000000) {
+                formattedValue = prefix + (num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + ' Cr';
+              } else {
+                formattedValue = prefix + num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+              }
+            }
+          }
           return (
             <p key={i} style={{ margin: 0, color: p.color || '#5A6A85' }}>
               {p.name || p.dataKey}: {formattedValue}
@@ -89,7 +101,12 @@ export const GLDistributionChart = ({ selectedBranch = 'ALL' }) => {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip 
+                    formatter={(value) => {
+                      const total = data.reduce((acc, curr) => acc + (curr.value || 0), 0);
+                      return total ? `${((value / total) * 100).toFixed(1)}%` : '0%';
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

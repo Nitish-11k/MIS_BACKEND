@@ -9,11 +9,10 @@ import DynamicDataGrid from './DynamicDataGrid';
 const COLORS = ['#F97316', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#14B8A6', '#F59E0B', '#34D399', '#6366F1'];
 
 const formatAmount = (num) => {
-  if (!num && num !== 0) return '0';
-  if (Math.abs(num) >= 10000000) return `${(num / 10000000).toFixed(1)} Cr`;
-  if (Math.abs(num) >= 100000) return `${(num / 100000).toFixed(1)} L`;
-  if (Math.abs(num) >= 1000) return `${(num / 1000).toFixed(1)} K`;
-  return `${num.toFixed(0)}`;
+  if (num === null || num === undefined) return '0';
+  const val = Number(num) / 1000;
+  if (Math.abs(val) >= 10000000) return `₹ ${(val / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹ ${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
 
 // --- DICTIONARY FOR READABLE NAMES ---
@@ -151,8 +150,8 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }}>
         
-        {/* TOP ROW: Donut & Line Chart */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', minHeight: '350px' }}>
+        {/* TOP ROW: Donut Chart */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', minHeight: '350px' }}>
           
           {/* Donut Chart Widget */}
           <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '20px', display: 'flex', flexDirection: 'column' }}>
@@ -176,9 +175,9 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
                     ))}
                   </Pie>
                   <Tooltip formatter={(value, name, props) => {
-                    const val = props && props.payload && primaryMetric ? props.payload[primaryMetric] : value;
-                    const pName = props && props.payload && props.payload.name ? props.payload.name : name;
-                    return [formatAmount(val), pName];
+                    const total = donutData.reduce((acc, curr) => acc + (curr._abs_val || 0), 0);
+                    const val = props && props.payload && props.payload._abs_val ? props.payload._abs_val : value;
+                    return total ? `${((val / total) * 100).toFixed(1)}%` : '0%';
                   }} />
                   <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
                 </PieChart>
@@ -186,31 +185,6 @@ const DynamicVisualizer = ({ tableName, title, branchCode = 'ALL', period = '30D
             </div>
           </div>
 
-          {/* Area/Line Chart Widget */}
-          <div className="card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
-              Trend Analysis ({getReadableName(secondaryMetric)})
-            </div>
-            <div style={{ height: '260px', width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }} onClick={handleChartClick}>
-                  <defs>
-                    <linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS[1]} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={COLORS[1]} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={formatAmount} tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value) => [formatAmount(value), getReadableName(secondaryMetric)]} cursor={{ stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '5 5' }} />
-                  {secondaryMetric ? (
-                    <Area type="monotone" dataKey={secondaryMetric} stroke={COLORS[1]} fillOpacity={1} fill="url(#colorMetric)" style={{ cursor: 'pointer' }} />
-                  ) : null}
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
         </div>
 
         {/* BOTTOM ROW: Clean Loan Visual Chart (Replaces text grid with high-impact loan metrics visual) */}

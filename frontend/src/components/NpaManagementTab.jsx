@@ -19,7 +19,7 @@ const NpaManagementTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
       fetch(`http://127.0.0.1:8000/api/npa-summary?branch_code=${selectedBranch}&period=${activePeriod}`).then(res => res.json())
     ])
       .then(([branchData, trendRes, summaryRes]) => {
-        setNpaData(Array.isArray(branchData) ? branchData.map(d => ({ ...d, NPA: (d.NPA||0)/100000 })) : []);
+        setNpaData(Array.isArray(branchData) ? branchData.map(d => ({ ...d, NPA: (d.NPA||0)/10000000 })) : []);
         setTrendData(Array.isArray(trendRes) ? trendRes : []);
         setSummaryData(Array.isArray(summaryRes) ? summaryRes : []);
         setLoading(false);
@@ -83,7 +83,10 @@ const NpaManagementTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                         <Cell key={`cell-${index}`} fill={['#EF4444', '#F59E0B', '#3B82F6', '#10B981', '#6366F1'][index % 5]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => `₹${value.toFixed(2)} Lakhs`} />
+                    <Tooltip formatter={(value) => {
+                      const total = displaySummaryData.reduce((acc, curr) => acc + curr.amount, 0);
+                      return total ? `${((value / total) * 100).toFixed(1)}%` : '0%';
+                    }} />
                     <Legend verticalAlign="bottom" height={36} />
                   </PieChart>
                 </ResponsiveContainer>

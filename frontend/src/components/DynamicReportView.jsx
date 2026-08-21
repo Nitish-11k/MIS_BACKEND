@@ -8,9 +8,10 @@ import { Activity, Database, FileText } from 'lucide-react';
 const COLORS = ['#20C48F', '#15559F', '#FF6B6B', '#46C9D7', '#814C9E', '#FFB74D'];
 
 const formatAmount = (num) => {
-  if (typeof num !== 'number') return num;
-  if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toFixed(2)} Cr`;
-  return `₹ ${new Intl.NumberFormat('en-IN').format(num)}`;
+  if (num === null || num === undefined) return '0';
+  const val = Number(num) / 1000;
+  if (Math.abs(val) >= 10000000) return `₹ ${(val / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹ ${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -105,7 +106,12 @@ const DynamicReportView = ({ tableName, selectedBranch = 'ALL' }) => {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip 
+                      formatter={(value) => {
+                        const total = stats.distribution.reduce((acc, curr) => acc + (curr.value || 0), 0);
+                        return total ? `${((value / total) * 100).toFixed(1)}%` : '0%';
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>

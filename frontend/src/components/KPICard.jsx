@@ -2,19 +2,10 @@ import React from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 const formatAmount = (num) => {
-  if (num === null || num === undefined) return '0';
-  const absNum = Math.abs(num);
-  
-  let val = '';
-  let suffix = '';
-  
-  // Adjusted to match mockup exactly (e.g., Lakhs and Cr)
-  if (absNum >= 10000000) { val = (absNum / 10000000).toFixed(2); suffix = ' Cr'; }
-  else if (absNum >= 100000) { val = (absNum / 100000).toFixed(2); suffix = ' Lakh'; }
-  else if (absNum >= 1000) { val = (absNum / 1000).toFixed(2); suffix = ' K'; }
-  else { val = absNum.toFixed(2); suffix = ''; }
-
-  return `₹${val}${suffix}`;
+  if (num === null || num === undefined) return '₹ 0.00';
+  const val = Number(num) / 1000;
+  if (Math.abs(val) >= 10000000) return `₹ ${(val / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹ ${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
 
 // Generate dummy sparkline data based on trend type

@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 
 const formatAmount = (num) => {
-  if (!num) return '0';
-  if (num >= 10000000) return `₹ ${(num / 10000000).toFixed(2)} Cr`;
-  if (num >= 100000) return `₹ ${(num / 100000).toFixed(2)} L`;
-  if (num >= 1000) return `₹ ${(num / 1000).toFixed(2)} K`;
-  return `₹ ${num.toFixed(2)}`;
+  if (num === null || num === undefined) return '0';
+  const val = Number(num) / 1000;
+  if (Math.abs(val) >= 10000000) return `₹ ${(val / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹ ${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
 
 const LeaderboardWidget = ({ title, data, dataKey, nameKey, color = '#2563EB', isCurrency = true }) => {

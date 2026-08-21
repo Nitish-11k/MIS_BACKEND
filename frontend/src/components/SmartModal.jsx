@@ -12,6 +12,8 @@ import {
   Cell,
   CartesianGrid,
   Legend,
+  ComposedChart,
+  Line,
 } from 'recharts';
 
 const API_BASE = 'http://127.0.0.1:8000';
@@ -56,20 +58,9 @@ const formatLakhs = (value) => {
 
 const formatCompact = (value) => {
   const number = toNumber(value);
-
-  if (Math.abs(number) >= 10000000) {
-    return `₹ ${(number / 10000000).toFixed(2)} Cr`;
-  }
-
-  if (Math.abs(number) >= 100000) {
-    return `₹ ${(number / 100000).toFixed(2)} L`;
-  }
-
-  if (Math.abs(number) >= 1000) {
-    return `₹ ${(number / 1000).toFixed(2)} K`;
-  }
-
-  return formatINR(number);
+  const num = number / 1000;
+  if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹ ${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
 
 const StatCard = ({ title, value, subtitle }) => {
@@ -202,7 +193,7 @@ const CustomTooltip = ({ active, payload, label }) => {
             marginTop: '3px',
           }}
         >
-          {item.name}: {formatINR(item.value)}
+          {item.name}: {item.name.includes('count') || item.name.includes('Accounts') ? Number(item.value).toLocaleString('en-IN') : formatCr(item.value)}
         </div>
       ))}
     </div>
@@ -252,65 +243,49 @@ const customTableStyles = {
   }
 };
 
+const STATUS_COLORS = {
+  Open: '#10B981',
+  Dormant: '#6366F1',
+  Unclaimed: '#F59E0B',
+  Inoperative: '#F97316',
+  Closed: '#EF4444',
+  Inactive: '#8B5CF6',
+  Others: '#94A3B8',
+};
+
+const SCHEME_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#14B8A6', '#F97316', '#6366F1', '#EC4899', '#0EA5E9'];
+
+const formatCr = (num) => {
+  if (num === null || num === undefined) return '₹0';
+  const val = Number(num) / 1000;
+  if (Math.abs(val) >= 10000000) return `₹${(val / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+};
+
+const isMasterType = (type) => ['total', 'deposits', 'loans'].includes(type);
+
 const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate, onClose }) => {
   const [data, setData] = useState([]);
+  const [masterStats, setMasterStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [drillDownRegion, setDrillDownRegion] = useState(null);
+  const [showOtherCodes, setShowOtherCodes] = useState(false);
 
   const config = useMemo(() => {
     switch (type) {
       case 'deposits':
-        return {
-          endpoint: '/api/deposit-branch-wise',
-          title: 'Deposit Analysis',
-          amountKey: 'value',
-          amountLabel: 'Deposit Balance',
-        };
-
+        return { endpoint: '/api/deposit-branch-wise', title: 'Total Deposits - Region Wise', amountKey: 'value', amountLabel: 'Deposit Balance' };
       case 'loans':
-        return {
-          endpoint: '/api/loan-branch-wise',
-          title: 'Loan Analysis',
-          amountKey: 'value',
-          amountLabel: 'Loan Balance',
-        };
-
-      case 'npa':
-        return {
-          endpoint: '/api/npa-branch-wise',
-          title: 'NPA Analysis',
-          amountKey: 'value',
-          amountLabel: 'NPA Balance',
-        };
-
-      case 'opened':
-        return {
-          endpoint: '/api/opened-branch-wise',
-          title: 'Accounts Opened Analysis',
-          amountKey: 'value',
-          amountLabel: 'Opened Accounts',
-          isCount: true,
-        };
-
-      case 'closed':
-        return {
-          endpoint: '/api/closed-branch-wise',
-          title: 'Accounts Closed Analysis',
-          amountKey: 'value',
-          amountLabel: 'Closed Accounts',
-          isCount: true,
-        };
-
+        return { endpoint: '/api/loan-branch-wise', title: 'Total Loans - Region Wise', amountKey: 'value', amountLabel: 'Loan Balance' };
       case 'total':
-        return {
-          endpoint: '/api/total-branch-wise',
-          title: 'Total Accounts Analysis',
-          amountKey: 'value',
-          amountLabel: 'Total Accounts',
-          isCount: true,
-        };
-
+        return { endpoint: '/api/master-stats', title: 'Total Accounts Overview', amountKey: 'value', amountLabel: 'Total Accounts', isMaster: true };
+      case 'npa':
+        return { endpoint: '/api/npa-branch-wise', title: 'NPA Analysis', amountKey: 'value', amountLabel: 'NPA Balance' };
+      case 'opened':
+        return { endpoint: '/api/opened-branch-wise', title: 'Accounts Opened Analysis', amountKey: 'value', amountLabel: 'Opened Accounts', isCount: true };
+      case 'closed':
+        return { endpoint: '/api/closed-branch-wise', title: 'Accounts Closed Analysis', amountKey: 'value', amountLabel: 'Closed Accounts', isCount: true };
       default:
         return null;
     }
@@ -318,53 +293,32 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
 
   useEffect(() => {
     if (!config) return;
-
     const controller = new AbortController();
-
     const loadData = async () => {
       setLoading(true);
-
       try {
-        const params = new URLSearchParams({
-          branch_code: drillDownRegion ? `REGION:${drillDownRegion}` : (branchCode || 'ALL'),
-        });
-        if (startDate && endDate) {
-          params.append('start_date', startDate);
-          params.append('end_date', endDate);
-        } else if (startDate) {
-          params.append('start_date', startDate);
+        const bc = drillDownRegion ? `REGION:${drillDownRegion}` : (branchCode || 'ALL');
+        if (config.isMaster) {
+          const res = await fetch(`${API_BASE}/api/master-stats?branch_code=${bc}`, { signal: controller.signal });
+          const result = await res.json();
+          setMasterStats(result);
         } else {
-          params.append('period', period || 'ALL');
+          const params = new URLSearchParams({ branch_code: bc });
+          if (startDate && endDate) { params.append('start_date', startDate); params.append('end_date', endDate); }
+          else if (startDate) { params.append('start_date', startDate); }
+          else { params.append('period', period || 'ALL'); }
+          const response = await fetch(`${API_BASE}${config.endpoint}?${params.toString()}`, { signal: controller.signal });
+          if (!response.ok) throw new Error(`API failed: ${response.status}`);
+          const result = await response.json();
+          setData(Array.isArray(result) ? result : []);
         }
-
-        const response = await fetch(
-          `${API_BASE}${config.endpoint}?${params.toString()}`,
-          {
-            signal: controller.signal,
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`API failed: ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        setData(Array.isArray(result) ? result : []);
       } catch (error) {
-        if (error.name !== 'AbortError') {
-          console.error('SmartModal API error:', error);
-          setData([]);
-        }
+        if (error.name !== 'AbortError') { console.error('SmartModal API error:', error); setData([]); }
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
-
     loadData();
-
     return () => controller.abort();
   }, [config, branchCode, period]);
 
@@ -375,7 +329,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
           row.name ||
           row.branch_name ||
           row.BRANCH_NAME ||
-          `Branch ${index + 1}`;
+          ((branchCode === 'ALL' && !drillDownRegion) ? `Regional Office ${index + 1}` : `Branch ${index + 1}`);
 
         const rawValue =
           row.value ??
@@ -418,7 +372,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
     );
   }, [normalizedData]);
 
-  const topData = sortedData.slice(0, 8);
+  const topData = sortedData;
 
   const pieData = sortedData
     .filter((row) => row.numericValue > 0)
@@ -430,7 +384,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
 
   const tableColumns = [
     {
-      name: 'Branch',
+      name: (branchCode === 'ALL' && !drillDownRegion) ? 'Regional Office' : 'Branch',
       selector: (row) => row.name,
       sortable: true,
       grow: 2,
@@ -445,7 +399,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
       cell: (row) =>
         config?.isCount
           ? row.numericValue.toLocaleString('en-IN')
-          : formatINR(row.numericValue),
+          : formatCr(row.numericValue),
     },
     ...(type === 'opened' || type === 'closed' || type === 'total'
       ? [
@@ -479,6 +433,235 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
   ];
 
   if (!config) return null;
+
+  // ===== MASTER STATS MODAL (total / deposits / loans) =====
+  if (config.isMaster) {
+    const dep = masterStats?.deposits || {};
+    const loan = masterStats?.loans || {};
+    const depStatuses = dep.statuses || {};
+    const loanSchemes = loan.schemes || [];
+
+    // Deposit pie data
+    const depPieData = ['Open', 'Dormant', 'Unclaimed', 'Inoperative', 'Closed', 'Inactive']
+      .map(s => ({ name: s, value: depStatuses[s] || 0, fill: STATUS_COLORS[s] }))
+      .filter(d => d.value > 0);
+    if (depStatuses.Others?.count) depPieData.push({ name: 'Others', value: depStatuses.Others.count, fill: STATUS_COLORS.Others });
+
+    // Loan pie data - show top 8 individually, rest as "Others"
+    const MAX_LOAN_SHOW = 8;
+    const loanPieData = [];
+    let loanOthersCount = 0;
+    let loanOthersAmount = 0;
+    const loanOthersList = [];
+    loanSchemes.forEach((s, i) => {
+      if (i < MAX_LOAN_SHOW) {
+        loanPieData.push({ name: s.scheme, value: s.count, amount: s.amount, fill: SCHEME_COLORS[i % SCHEME_COLORS.length] });
+      } else {
+        loanOthersCount += s.count;
+        loanOthersAmount += s.amount;
+        loanOthersList.push(s);
+      }
+    });
+    if (loanOthersCount > 0) {
+      loanPieData.push({ name: 'Others', value: loanOthersCount, amount: loanOthersAmount, fill: '#94A3B8' });
+    }
+
+    return (
+      <div onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.62)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ width: 'min(1400px, 96vw)', height: 'min(900px, 94vh)', background: '#F8FAFC', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.20)' }}>
+          {/* Header */}
+          <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '18px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>{config.title}</div>
+              <div style={{ marginTop: '4px', fontSize: '12px', color: '#64748B' }}>Branch: {branchCode === 'ALL' ? 'All Branches' : branchCode}</div>
+            </div>
+            <button onClick={onClose} style={{ border: 'none', background: '#F1F5F9', color: '#334155', borderRadius: '8px', padding: '9px 14px', cursor: 'pointer', fontWeight: '600' }}>Close</button>
+          </div>
+
+          {/* Body */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px' }}>
+            {loading ? (
+              <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '14px' }}>Loading master data...</div>
+            ) : (
+              <>
+                {/* Top KPI Row - only account counts */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '20px' }}>
+                  <StatCard title="Total Accounts" value={((dep.total_accounts || 0) + (loan.total_accounts || 0)).toLocaleString('en-IN')} subtitle="Deposit + Loan" />
+                  <StatCard title="Deposit Accounts" value={(dep.total_accounts || 0).toLocaleString('en-IN')} subtitle="Status-wise breakdown below" />
+                  <StatCard title="Loan Accounts" value={(loan.total_accounts || 0).toLocaleString('en-IN')} subtitle="Scheme-wise breakdown below" />
+                </div>
+
+                {/* TWO-PANEL GRID: Left = Deposits, Right = Loans */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+
+                  {/* ===== LEFT PANEL: DEPOSITS ===== */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: '#0F172A', borderBottom: '3px solid #10B981', paddingBottom: '8px' }}>Deposit Accounts</div>
+
+                    {/* Deposit Pie Chart */}
+                    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '18px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '12px' }}>Status Distribution</div>
+                      <div style={{ height: '220px', display: 'flex', alignItems: 'center' }}>
+                        <div style={{ width: '50%', height: '100%' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={depPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                                {depPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                              </Pie>
+                              <Tooltip formatter={(value) => dep.total_accounts ? `${((value / dep.total_accounts) * 100).toFixed(1)}%` : '0%'} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div style={{ width: '50%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {depPieData.map((entry, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: entry.fill }}></div>
+                                <span style={{ color: '#334155', fontWeight: '500' }}>{entry.name}</span>
+                              </div>
+                              <span style={{ color: '#0F172A', fontWeight: '700' }}>{entry.value.toLocaleString('en-IN')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Deposit Status Table */}
+                    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#0F172A', color: '#fff' }}>
+                            <th style={{ padding: '9px 12px', textAlign: 'left', borderTopLeftRadius: '6px' }}>Status</th>
+                            <th style={{ padding: '9px 12px', textAlign: 'center' }}>Code</th>
+                            <th style={{ padding: '9px 12px', textAlign: 'right' }}>Accounts</th>
+                            <th style={{ padding: '9px 12px', textAlign: 'right', borderTopRightRadius: '6px' }}>Share</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {['Open', 'Dormant', 'Unclaimed', 'Inoperative', 'Closed', 'Inactive'].map((status, i) => {
+                            const codeMap = { Open: '00', Dormant: '01', Unclaimed: '02', Inoperative: '03', Closed: '07', Inactive: '11' };
+                            const count = depStatuses[status] || 0;
+                            const pct = dep.total_accounts ? ((count / dep.total_accounts) * 100).toFixed(1) : '0.0';
+                            return (
+                              <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background='#F8FAFC'} onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                                <td style={{ padding: '10px 12px', fontWeight: '600' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: STATUS_COLORS[status] }}></div>
+                                    <span style={{ color: STATUS_COLORS[status] }}>{status}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '10px 12px', textAlign: 'center', color: '#64748B', fontFamily: 'monospace' }}>{codeMap[status]}</td>
+                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0F172A', fontWeight: '700' }}>{count.toLocaleString('en-IN')}</td>
+                                <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                    <div style={{ width: '50px', height: '5px', backgroundColor: '#E2E8F0', borderRadius: '3px', overflow: 'hidden' }}>
+                                      <div style={{ width: `${Math.min(parseFloat(pct), 100)}%`, height: '100%', backgroundColor: STATUS_COLORS[status], borderRadius: '3px' }}></div>
+                                    </div>
+                                    <span style={{ color: '#64748B', fontWeight: '600', fontSize: '11px' }}>{pct}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {/* Others row */}
+                          {depStatuses.Others?.count > 0 && (
+                            <>
+                              <tr style={{ borderBottom: showOtherCodes ? 'none' : '1px solid #F1F5F9', cursor: 'pointer' }} onClick={() => setShowOtherCodes(!showOtherCodes)} onMouseEnter={e => e.currentTarget.style.background='#F0F9FF'} onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                                <td style={{ padding: '10px 12px', fontWeight: '600', color: '#3B82F6' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#94A3B8' }}></div>
+                                    Others {showOtherCodes ? '▲' : '▼'}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '10px 12px', textAlign: 'center', color: '#64748B' }}>—</td>
+                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0F172A', fontWeight: '700' }}>{depStatuses.Others.count.toLocaleString('en-IN')}</td>
+                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#64748B', fontWeight: '600', fontSize: '11px' }}>{dep.total_accounts ? ((depStatuses.Others.count / dep.total_accounts) * 100).toFixed(1) : '0.0'}%</td>
+                              </tr>
+                              {showOtherCodes && depStatuses.Others.codes?.map((code, ci) => (
+                                <tr key={ci} style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                                  <td style={{ padding: '6px 12px 6px 32px', color: '#64748B', fontSize: '11px' }}>Code: "{code.code || 'Empty'}"</td>
+                                  <td style={{ padding: '6px 12px', textAlign: 'center', color: '#94A3B8', fontFamily: 'monospace', fontSize: '11px' }}>{code.code || '—'}</td>
+                                  <td style={{ padding: '6px 12px', textAlign: 'right', color: '#64748B', fontSize: '11px', fontWeight: '600' }}>{code.count.toLocaleString('en-IN')}</td>
+                                  <td></td>
+                                </tr>
+                              ))}
+                            </>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* ===== RIGHT PANEL: LOANS ===== */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: '#0F172A', borderBottom: '3px solid #3B82F6', paddingBottom: '8px' }}>Loan Accounts</div>
+
+                    {/* Loan Pie Chart */}
+                    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '18px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '12px' }}>Scheme Distribution</div>
+                      <div style={{ height: '220px', display: 'flex', alignItems: 'center' }}>
+                        <div style={{ width: '50%', height: '100%' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={loanPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                                {loanPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                              </Pie>
+                              <Tooltip formatter={(value) => loan.total_accounts ? `${((value / loan.total_accounts) * 100).toFixed(1)}%` : '0%'} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div style={{ width: '50%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          {loanPieData.map((entry, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '60%' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: entry.fill, flexShrink: 0 }}></div>
+                                <span style={{ color: '#334155', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.name}>{entry.name}</span>
+                              </div>
+                              <span style={{ color: '#0F172A', fontWeight: '700' }}>{entry.value.toLocaleString('en-IN')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Loan Scheme Table - ALL schemes */}
+                    <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px' }}>
+                      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#0F172A', color: '#fff', position: 'sticky', top: 0 }}>
+                              <th style={{ padding: '9px 12px', textAlign: 'left', borderTopLeftRadius: '6px' }}>Scheme</th>
+                              <th style={{ padding: '9px 12px', textAlign: 'right' }}>Accounts</th>
+                              <th style={{ padding: '9px 12px', textAlign: 'right', borderTopRightRadius: '6px' }}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {loanSchemes.map((s, i) => (
+                              <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background='#F8FAFC'} onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                                <td style={{ padding: '9px 12px', color: '#334155', fontWeight: '500' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{ width: '6px', height: '6px', borderRadius: '2px', backgroundColor: SCHEME_COLORS[i % SCHEME_COLORS.length], flexShrink: 0 }}></div>
+                                    {s.scheme}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '9px 12px', textAlign: 'right', color: '#0F172A', fontWeight: '600' }}>{s.count.toLocaleString('en-IN')}</td>
+                                <td style={{ padding: '9px 12px', textAlign: 'right', color: '#0F172A', fontWeight: '600' }}>{formatCr(s.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -617,9 +800,9 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
                 />
 
                 <StatCard
-                  title="Branches"
+                  title={(branchCode === 'ALL' && !drillDownRegion) ? 'Regional Offices' : 'Branches'}
                   value={normalizedData.length.toLocaleString('en-IN')}
-                  subtitle="Branches returned for selected filter"
+                  subtitle={(branchCode === 'ALL' && !drillDownRegion) ? 'Regions returned for selected filter' : 'Branches returned for selected filter'}
                 />
 
                 <StatCard
@@ -674,60 +857,103 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
                     }}
                   >
                     <ChartCard
-                      title={`Top ${Math.min(8, topData.length)} ${config.isCount ? 'Branches' : 'Balances'}`}
+                      title={`${config.isCount ? ((branchCode === 'ALL' && !drillDownRegion) ? 'Region-wise Accounts' : 'Branch-wise Accounts') : ((branchCode === 'ALL' && !drillDownRegion) ? 'Region-wise Balances' : 'Branch-wise Balances')} (${topData.length})`}
                       subtitle={
                         config.isCount
-                          ? 'Branch-wise account count'
-                          : 'Branch-wise balance'
+                          ? ((branchCode === 'ALL' && !drillDownRegion) ? 'Region-wise account count' : 'Branch-wise account count')
+                          : ((branchCode === 'ALL' && !drillDownRegion) ? 'Region-wise balance' : 'Branch-wise balance')
                       }
                     >
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={topData}
-                          layout="vertical"
-                          margin={{
-                            top: 5,
-                            right: 20,
-                            left: 20,
-                            bottom: 5,
-                          }}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            horizontal={false}
-                          />
-
-                          <XAxis
-                            type="number"
-                            tickFormatter={(value) =>
-                              config.isCount
-                                ? value.toLocaleString('en-IN')
-                                : formatCompact(value)
-                            }
-                          />
-
-                          <YAxis
-                            type="category"
-                            dataKey="name"
-                            width={120}
-                            tick={{ fontSize: 11 }}
-                          />
-
-                          <Tooltip content={<CustomTooltip />} />
-
-                          <Bar
-                            dataKey="numericValue"
-                            name={config.amountLabel}
-                            fill="#15559F"
-                            radius={[0, 5, 5, 0]}
-                            onClick={(data) => {
-                              if (branchCode === 'ALL' && !drillDownRegion && data && data.name) {
-                                setDrillDownRegion(data.name);
-                              }
+                        {type === 'deposits' || type === 'loans' ? (
+                          <ComposedChart
+                            data={topData}
+                            margin={{ top: 15, right: 20, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis 
+                              dataKey="name" 
+                              tick={{ fontSize: 11 }} 
+                              axisLine={false} 
+                              tickLine={false}
+                            />
+                            <YAxis 
+                               tickFormatter={(value) => config.isCount ? value.toLocaleString('en-IN') : formatCompact(value)} 
+                               tick={{ fontSize: 11 }}
+                               axisLine={false}
+                               tickLine={false}
+                            />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Bar 
+                              dataKey="numericValue" 
+                              name={config.amountLabel} 
+                              fill={type === 'deposits' ? "#10B981" : "#3B82F6"}
+                              radius={[5, 5, 0, 0]}
+                              barSize={40}
+                              onClick={(data) => {
+                                if (branchCode === 'ALL' && !drillDownRegion && data && data.name) {
+                                  setDrillDownRegion(data.name);
+                                }
+                              }}
+                              style={{ cursor: (branchCode === 'ALL' && !drillDownRegion) ? 'pointer' : 'default' }}
+                            />
+                            <Line 
+                               type="monotone" 
+                               dataKey="numericValue" 
+                               name={config.amountLabel + ' Trend'}
+                               stroke={type === 'deposits' ? "#047857" : "#1D4ED8"} 
+                               strokeWidth={3} 
+                               dot={{ r: 4 }} 
+                            />
+                          </ComposedChart>
+                        ) : (
+                          <BarChart
+                            data={topData}
+                            layout="vertical"
+                            margin={{
+                              top: 5,
+                              right: 20,
+                              left: 20,
+                              bottom: 5,
                             }}
-                            style={{ cursor: (branchCode === 'ALL' && !drillDownRegion) ? 'pointer' : 'default' }}
-                          />
-                        </BarChart>
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              horizontal={false}
+                            />
+
+                            <XAxis
+                              type="number"
+                              tickFormatter={(value) =>
+                                config.isCount
+                                  ? value.toLocaleString('en-IN')
+                                  : formatCompact(value)
+                              }
+                            />
+
+                            <YAxis
+                              type="category"
+                              dataKey="name"
+                              width={120}
+                              tick={{ fontSize: 11 }}
+                            />
+
+                            <Tooltip content={<CustomTooltip />} />
+
+                            <Bar
+                              dataKey="numericValue"
+                              name={config.amountLabel}
+                              fill="#15559F"
+                              radius={[0, 5, 5, 0]}
+                              onClick={(data) => {
+                                if (branchCode === 'ALL' && !drillDownRegion && data && data.name) {
+                                  setDrillDownRegion(data.name);
+                                }
+                              }}
+                              style={{ cursor: (branchCode === 'ALL' && !drillDownRegion) ? 'pointer' : 'default' }}
+                            />
+                          </BarChart>
+                        )}
                       </ResponsiveContainer>
                     </ChartCard>
 
@@ -756,11 +982,10 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
                           </Pie>
 
                           <Tooltip
-                            formatter={(value) =>
-                              config.isCount
-                                ? value.toLocaleString('en-IN')
-                                : formatINR(value)
-                            }
+                            formatter={(value) => {
+                              if (!totalValue) return '0%';
+                              return `${((value / totalValue) * 100).toFixed(1)}%`;
+                            }}
                           />
 
                           <Legend
@@ -817,7 +1042,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
 
                       <input
                         type="text"
-                        placeholder="Search branch..."
+                        placeholder={(branchCode === 'ALL' && !drillDownRegion) ? 'Search regional office...' : 'Search branch...'}
                         value={search}
                         onChange={(event) =>
                           setSearch(event.target.value)

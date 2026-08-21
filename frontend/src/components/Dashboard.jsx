@@ -126,7 +126,7 @@ const Dashboard = ({ user, onLogout }) => {
         setKpiData(kpiRes || {});
         setAccountMetrics(accountRes || {});
         setBranchNpaData(Array.isArray(branchNpaRes) ? branchNpaRes : []);
-        setBarChartData(Array.isArray(prodData) && prodData.length > 0 ? prodData.slice(0,7).map(d => ({ name: d.name.substring(0, 10), Deposits: (d.credit||0)/100000, Loans: (d.debit||0)/100000 })) : []);
+        setBarChartData(Array.isArray(prodData) && prodData.length > 0 ? prodData.slice(0,7).map(d => ({ name: d.name.substring(0, 10), Deposits: (d.credit||0), Loans: (d.debit||0) })) : []);
         setPieData(Array.isArray(pieRes) ? pieRes : []);
         setTrendData(Array.isArray(trendDataRes) ? trendDataRes : []);
         setNpaSummaryData(Array.isArray(npaSummaryRes) ? npaSummaryRes : []);
@@ -247,6 +247,7 @@ const Dashboard = ({ user, onLogout }) => {
               npaTrendData={npaTrendData}
               masterStats={masterStats}
               selectedPeriod={selectedPeriod}
+              selectedBranch={apiBranchCode}
               setActiveModal={setActiveModal}
               setActiveTab={setActiveTab}
             />

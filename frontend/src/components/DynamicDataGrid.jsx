@@ -170,14 +170,20 @@ const DynamicDataGrid = ({
         result.columns.length > 0
       ) {
         const generatedColumns =
-          result.columns.map((column) => ({
-            key: column,
-            name: column.replace(/_/g, ' '),
-            selector: (row) => (row && row[column] !== undefined && row[column] !== null ? String(row[column]) : ''),
-            sortable: true,
-            wrap: true,
-            minWidth: '150px',
-          }));
+          result.columns.map((column) => {
+            let displayName = column.replace(/_/g, ' ');
+            if (branchCode === 'ALL' && (column === 'BRANCH_NAME' || column === 'BRANCH_CODE' || column === 'BRANCH')) {
+              displayName = displayName.replace(/BRANCH/i, 'REGIONAL OFFICE');
+            }
+            return {
+              key: column,
+              name: displayName,
+              selector: (row) => (row && row[column] !== undefined && row[column] !== null ? String(row[column]) : ''),
+              sortable: true,
+              wrap: true,
+              minWidth: '150px',
+            };
+          });
 
         setColumns(generatedColumns);
       }

@@ -894,49 +894,25 @@ def get_deposit_branch_wise(
     cursor = conn.cursor()
 
     try:
-        where_dep, params_dep = get_date_filter_sql(
-            period,
-            "DEPOSITS_BALANCE_FILE_DEPD0586"
-        )
-        branch_condition = ""
-        branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_dep.upper() else "WHERE", "BRANCH_CODE")
-        branch_condition += branch_sql
-        params_dep.extend(branch_params)
-
-        select_name, join_sql, group_col = get_grouping_sql(branch_code, "DEPOSITS_BALANCE_FILE_DEPD0586", "D")
-        where_dep = where_dep.replace("DEPOSITS_BALANCE_FILE_DEPD0586.", "D.")
-        branch_condition = branch_condition.replace("BRANCH_CODE", "D.BRANCH_CODE")
-
+        branch_condition, branch_params = get_branch_filter_sql(branch_code, "WHERE", "D.BRNO")
+        select_name, join_sql, group_col = get_grouping_sql(branch_code, "DEP_SHADOW", "D")
+        
+        # We need to map D.BRNO for the join, but get_grouping_sql expects D.BRANCH_CODE
+        # so let's adjust join_sql and group_col
+        join_sql = join_sql.replace("D.BRANCH_CODE", "D.BRNO")
+        
         query = f"""
-            WITH LatestAccounts AS (
-                SELECT
-                    D.ID,
-                    D.ACCOUNT_NUMBER,
-                    D.BRANCH_CODE,
-                    D.BRANCH_NAME,
-                    D.CURRENT_BALANCE,
-                    {select_name} as grouped_name,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY
-                            D.BRANCH_CODE,
-                            D.ACCOUNT_NUMBER
-                        ORDER BY D.ID DESC
-                    ) AS rn
-                FROM DEPOSITS_BALANCE_FILE_DEPD0586 D
-                {join_sql}
-                {where_dep}
-                {branch_condition}
-            )
             SELECT
-                grouped_name,
-                SUM(TRY_CAST(REPLACE(ISNULL(CURRENT_BALANCE, '0'), ',', '') AS FLOAT)) AS TOTAL_DEPOSITS,
+                {select_name} as grouped_name,
+                SUM(TRY_CAST(REPLACE(ISNULL(D.CURRBAL, '0'), ',', '') AS FLOAT)) AS TOTAL_DEPOSITS,
                 COUNT(*) AS ACCOUNT_COUNT
-            FROM LatestAccounts
-            WHERE rn = 1
-            GROUP BY grouped_name
+            FROM dep_shadow_file D
+            {join_sql}
+            {branch_condition}
+            GROUP BY {group_col}
             ORDER BY TOTAL_DEPOSITS DESC
         """
-        cursor.execute(query, params_dep)
+        cursor.execute(query, branch_params)
         rows = cursor.fetchall()
         data = []
         for row in rows:
@@ -948,14 +924,10 @@ def get_deposit_branch_wise(
             })
         return data
     except Exception as e:
-        import pyodbc
-        if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
-            print(f"Error calculating branch-wise deposits: {e}")
+        print(f"Error calculating total branch-wise: {e}")
         return []
     finally:
         conn.close()
-
-
 
 @app.get("/api/kpi-summary")
 @lru_cache(maxsize=128)
@@ -1708,29 +1680,26 @@ def get_branch_network(branch_code: str = "ALL"):
 def get_loan_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    where_loan, params_loan = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_DET", start_date=start_date, end_date=end_date)
-    
-    branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_loan.upper() else "WHERE", "BRANCH_CODE")
-    where_loan += branch_sql
-    params_loan.extend(branch_params)
-    
-    select_name, join_sql, group_col = get_grouping_sql(branch_code, "BAL_IN_LOAN_ACC_GLCC_WISE_DET", "L")
-    where_loan = where_loan.replace("BAL_IN_LOAN_ACC_GLCC_WISE_DET.", "L.")
-        
     try:
+        branch_condition, branch_params = get_branch_filter_sql(branch_code, "WHERE", "L.BRNO")
+        select_name, join_sql, group_col = get_grouping_sql(branch_code, "LOAN_SHADOW", "L")
+        
+        join_sql = join_sql.replace("L.BRANCH_CODE", "L.BRNO")
+        
         cursor.execute(f"""
-            SELECT {select_name} as name, SUM(TRY_CAST(DR_BALANCE AS FLOAT)) as loans
-            FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET L
+            SELECT {select_name} as name, SUM(TRY_CAST(REPLACE(ISNULL(L.CURRBAL, '0'), ',', '') AS FLOAT)) as loans
+            FROM loan_shadow_file L
             {join_sql}
-            {where_loan}
+            {branch_condition}
             GROUP BY {group_col}
             ORDER BY loans DESC
-        """, params_loan)
+        """, branch_params)
         rows = cursor.fetchall()
         data = [{"name": r[0][:15] if r[0] else "Unknown", "Loans": float(r[1] or 0)} for r in rows]
     except:
         data = []
-    conn.close()
+    finally:
+        conn.close()
     return data
 
 @app.get("/api/loan-type-distribution")
@@ -1790,6 +1759,40 @@ def get_loan_type_branches(product_name: str, branch_code: str = "ALL", period: 
 # ==========================================
 # Trend Chart Data (Loans vs Deposits over time)
 # ==========================================
+def pad_trend_dates(data, period):
+    if period == "ALL" or not period or not data:
+        return data
+    
+    days = 0
+    if period == "7D": days = 7
+    elif period == "15D": days = 15
+    elif period == "30D": days = 30
+    elif period == "90D": days = 90
+    elif period == "6M": days = 180
+    elif period == "1Y" or period == "YTD": days = 365
+    
+    if days == 0:
+        return data
+        
+    from datetime import datetime, timedelta
+    max_date_str = max(d["name"] for d in data)
+    try:
+        max_date = datetime.strptime(max_date_str, "%Y-%m-%d")
+    except:
+        return data
+        
+    dates = [(max_date - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days)]
+    dates.reverse()
+    
+    data_map = {d["name"]: d for d in data}
+    padded = []
+    for dte in dates:
+        if dte in data_map:
+            padded.append(data_map[dte])
+        else:
+            padded.append({"name": dte, "Loans": 0.0, "Deposits": 0.0})
+    return padded
+
 @app.get("/api/trend-data")
 def get_trend_data(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
     conn = get_db_connection()
@@ -1827,14 +1830,14 @@ def get_trend_data(branch_code: str = "ALL", period: str = "ALL", start_date: Op
         trends = {}
         for r in loan_rows:
             dte = r[0]
-            val = float(r[1] or 0) / 100000  # Convert to Lakhs
+            val = float(r[1] or 0)
             if dte not in trends:
                 trends[dte] = {"name": dte, "Loans": 0, "Deposits": 0}
             trends[dte]["Loans"] = val
             
         for r in dep_rows:
             dte = r[0]
-            val = float(r[1] or 0) / 100000  # Convert to Lakhs
+            val = float(r[1] or 0)
             if dte not in trends:
                 trends[dte] = {"name": dte, "Loans": 0, "Deposits": 0}
             trends[dte]["Deposits"] = val
@@ -2537,7 +2540,7 @@ def npa_summary(branch_code: Optional[str] = None, period: str = "ALL", start_da
         
         summary = []
         for row in rows:
-            amt_cr = (row.amount or 0) / 100000
+            amt_cr = (row.amount or 0)
             pct = (row.amount / total_amount * 100) if total_amount > 0 else 0
             summary.append({
                 "category": row.category or "Unknown",

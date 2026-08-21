@@ -53,11 +53,11 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
   }, [selectedBranch, selectedPeriod, exactDate]);
 
   const formatCurrency = (val) => {
-    if (!val) return '₹ 0';
-    if (val >= 10000000) return `₹ ${(val / 10000000).toFixed(2)} Cr`;
-    if (val >= 100000) return `₹ ${(val / 100000).toFixed(2)} L`;
-    return `₹ ${val.toLocaleString()}`;
-  };
+  if (val === null || val === undefined) return '0';
+  const num = Number(val) / 1000;
+  if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+  return `₹ ${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+};
 
   // Prepare Modal Data cleanly based on active modal type
   const rawModalData = useMemo(() => {
@@ -90,7 +90,7 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
     if (!activeOthersModal) return null;
     const sorted = [...activeOthersModal].sort((a, b) => (b.value || 0) - (a.value || 0));
     const othersTotal = sorted.reduce((sum, item) => sum + (item.value || 0), 0);
-    const top5 = sorted.slice(0, 5).map((p, i) => ({
+    const top12 = sorted.slice(0, 12).map((p, i) => ({
       name: (p.name || 'Unknown').substring(0, 22),
       value: p.value || 0,
       fill: COLORS[i % COLORS.length]
@@ -122,17 +122,17 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
 
           <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>
             <div style={{ width: '340px', flexShrink: 0, background: '#F8FAFC', borderRadius: '12px', padding: '16px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: '#475569' }}>Top 5 by Value</h4>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: '#475569' }}>Top Products by Value</h4>
               <div style={{ flex: 1 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={top5} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <BarChart data={top12} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
-                    <XAxis type="number" tickFormatter={(val) => `${(val/100000).toFixed(0)}L`} tick={{ fill: '#64748B', fontSize: 10 }} />
+                    <XAxis type="number" tickFormatter={formatCurrency} tick={{ fill: '#64748B', fontSize: 10 }} />
                     <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 10, fontWeight: 500 }} width={130} interval={0} />
                     <Tooltip cursor={{ fill: '#F1F5F9' }} formatter={(value) => [formatCurrency(value), 'Amount']}
                       contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }} />
                     <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={20}>
-                      {top5.map((entry, index) => (
+                      {top12.map((entry, index) => (
                         <Cell key={`bar-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Bar>
@@ -273,7 +273,10 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                           />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(val) => formatCurrency(val)} />
+                      <Tooltip formatter={(value) => {
+                        const total = chartProducts.reduce((acc, curr) => acc + (curr.value || 0), 0);
+                        return total ? `${((value / total) * 100).toFixed(1)}%` : '0%';
+                      }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -306,7 +309,7 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
 
           {/* Bar Chart: Top Branches */}
           <div className="panel" style={{ padding: '20px', background: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow-panel)' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', marginBottom: '16px' }}>Top Branches by Outstanding Advances</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', marginBottom: '16px' }}>Top {selectedBranch === 'ALL' ? 'Regional Offices' : 'Branches'} by Outstanding Advances</h3>
             <div style={{ height: 'calc(100% - 35px)' }}>
               {branches && branches.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -348,13 +351,13 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #E2E8F0', paddingBottom: '16px' }}>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#0F172A', margin: 0 }}>
-                    {activeVisualModal === 'loans' && "Branch-wise Total Advances"}
-                    {activeVisualModal === 'npa' && "Branch-wise Total NPA"}
-                    {activeVisualModal === 'ratio' && "Branch-wise NPA Ratio"}
-                    {activeVisualModal === 'irregular' && "Branch-wise Irregular & Excess Draws"}
+                    {activeVisualModal === 'loans' && (selectedBranch === 'ALL' ? "Region-wise Total Advances" : "Branch-wise Total Advances")}
+                    {activeVisualModal === 'npa' && (selectedBranch === 'ALL' ? "Region-wise Total NPA" : "Branch-wise Total NPA")}
+                    {activeVisualModal === 'ratio' && (selectedBranch === 'ALL' ? "Region-wise NPA Ratio" : "Branch-wise NPA Ratio")}
+                    {activeVisualModal === 'irregular' && (selectedBranch === 'ALL' ? "Region-wise Irregular & Excess Draws" : "Branch-wise Irregular & Excess Draws")}
                   </h2>
                   <span style={{ fontSize: '13px', color: '#64748B', marginTop: '2px', display: 'block' }}>
-                    Showing {displayedModalData.length} of {rawModalData.length} branches
+                    Showing {displayedModalData.length} of {rawModalData.length} {selectedBranch === 'ALL' ? 'regions' : 'branches'}
                   </span>
                 </div>
 
@@ -420,7 +423,7 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                     <LineChart data={displayedModalData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" angle={-90} textAnchor="end" height={80} tick={{ fill: '#64748B', fontSize: 9 }} interval={0} />
-                      <YAxis tickFormatter={(val) => activeVisualModal === 'ratio' ? `${val}%` : `₹${(val/10000000).toFixed(2)}Cr`} tick={{ fill: '#475569', fontSize: 11 }} />
+                      <YAxis tickFormatter={(val) => activeVisualModal === 'ratio' ? `${val}%` : formatCurrency(val)} tick={{ fill: '#475569', fontSize: 11 }} />
                       <Tooltip cursor={{ fill: '#F8FAFC' }} formatter={(val) => [activeVisualModal === 'ratio' ? `${val}%` : formatCurrency(val), "Loans"]} />
                       <Line type="monotone" dataKey="value" stroke={activeVisualModal === 'npa' || activeVisualModal === 'ratio' ? '#EF4444' : activeVisualModal === 'irregular' ? '#8B5CF6' : '#3B82F6'} strokeWidth={2} dot={{ r: 3, fill: activeVisualModal === 'npa' || activeVisualModal === 'ratio' ? '#EF4444' : activeVisualModal === 'irregular' ? '#8B5CF6' : '#3B82F6' }} activeDot={{ r: 6 }} />
                     </LineChart>
@@ -439,7 +442,7 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                         tick={{fontSize: 11, fill: '#334155', fontWeight: 600}} 
                       />
                       <YAxis 
-                        tickFormatter={(val) => activeVisualModal === 'ratio' ? `${val}%` : `₹${(val/10000000).toFixed(2)}Cr`} 
+                        tickFormatter={(val) => activeVisualModal === 'ratio' ? `${val}%` : formatCurrency(val)} 
                         tick={{fontSize: 11, fill: '#64748B'}} 
                       />
                       <Tooltip 
