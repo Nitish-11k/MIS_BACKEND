@@ -21,9 +21,11 @@ const FilterBar = ({
   selectedProduct,
   setSelectedProduct,
   setActiveModal,
-  user
+  user,
+  onLogout
 }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   
   // Local states for filters to apply on click
@@ -135,9 +137,32 @@ const FilterBar = ({
             Filters {isFiltersExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
 
-          <button style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', padding: '8px', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}>
-            <MoreVertical size={18} color="#64748B" />
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', padding: '8px', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}
+            >
+              <MoreVertical size={18} color="#64748B" />
+            </button>
+            {isMenuOpen && (
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', width: '120px', zIndex: 50 }}>
+                <div 
+                  onClick={async () => {
+                    setIsMenuOpen(false);
+                    try {
+                      await fetch('http://127.0.0.1:8000/api/logout', { method: 'POST' });
+                    } catch (e) {
+                      console.error('Logout error:', e);
+                    }
+                    if(onLogout) onLogout();
+                  }} 
+                  style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', color: '#EF4444', display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  Sign Out
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

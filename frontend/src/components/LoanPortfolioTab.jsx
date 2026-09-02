@@ -6,7 +6,7 @@ import { Landmark, AlertTriangle, Scale, Percent, X } from 'lucide-react';
 
 const COLORS = ['#0F172A', '#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#14B8A6', '#EC4899', '#6366F1'];
 
-const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
+const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate, startDate, endDate, drillDownRegion, setDrillDownRegion, setActiveModal }) => {
   const [activeSubTab, setActiveSubTab] = useState('loans_master');
   const [activeVisualModal, setActiveVisualModal] = useState(null); // 'loans', 'npa', 'ratio', 'irregular'
   const [modalBranchLimit, setModalBranchLimit] = useState(15); // Default to Top 15 to avoid clutter
@@ -53,11 +53,11 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
   }, [selectedBranch, selectedPeriod, exactDate]);
 
   const formatCurrency = (val) => {
-  if (val === null || val === undefined) return '0';
-  const num = Number(val) / 1000;
-  if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
-  return `₹ ${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-};
+    if (val === null || val === undefined) return '0';
+    const num = Number(val);
+    if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
+    return `₹ ${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  };
 
   // Prepare Modal Data cleanly based on active modal type
   const rawModalData = useMemo(() => {
@@ -90,6 +90,7 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
     if (!activeOthersModal) return null;
     const sorted = [...activeOthersModal].sort((a, b) => (b.value || 0) - (a.value || 0));
     const othersTotal = sorted.reduce((sum, item) => sum + (item.value || 0), 0);
+    const othersTotalAbs = sorted.reduce((sum, item) => sum + Math.abs(item.value || 0), 0);
     const top12 = sorted.slice(0, 12).map((p, i) => ({
       name: (p.name || 'Unknown').substring(0, 22),
       value: p.value || 0,
@@ -168,7 +169,7 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                     <div style={{ textAlign: 'right', fontWeight: '600', color: '#0F172A' }}>{formatCurrency(item.value)}</div>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ background: '#EFF6FF', color: '#3B82F6', padding: '1px 6px', borderRadius: '10px', fontSize: '11px', fontWeight: '500' }}>
-                        {othersTotal > 0 ? ((item.value / othersTotal) * 100).toFixed(1) : 0}%
+                        {othersTotalAbs > 0 ? ((Math.abs(item.value || 0) / othersTotalAbs) * 100).toFixed(1) : 0}%
                       </span>
                     </div>
                   </div>
@@ -318,7 +319,19 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                     <XAxis type="number" tickFormatter={(val) => formatCurrency(val)} stroke="#64748B" fontSize={11} />
                     <YAxis dataKey="name" type="category" width={90} stroke="#64748B" fontSize={11} tick={{fill: '#0F172A', fontWeight: 600}} />
                     <Tooltip cursor={{fill: '#F1F5F9'}} formatter={(val) => formatCurrency(val)} />
-                    <Bar dataKey="value" fill="#10B981" radius={[0, 4, 4, 0]} barSize={16}>
+                    <Bar 
+                      dataKey="value" 
+                      fill="#10B981" 
+                      radius={[0, 4, 4, 0]} 
+                      barSize={16}
+                      onClick={(data) => {
+                        if (selectedBranch === 'ALL' && data && data.name) {
+                          setDrillDownRegion(data.name);
+                          setActiveModal('loans');
+                        }
+                      }}
+                      style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default' }}
+                    >
                       {branches.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}

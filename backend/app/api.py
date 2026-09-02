@@ -14,6 +14,8 @@ import shutil
 
 load_dotenv('.env')
 
+from app.cache import cache_manager
+
 app = FastAPI(title="Banking MIS API")
 
 # Configure CORS so the React app can access this API
@@ -33,16 +35,16 @@ async def pyodbc_exception_handler(request, exc):
 
 
 
-def get_grouping_sql(branch_code, table_name, alias="A"):
+def get_grouping_sql(branch_code, table_name, alias="A", branch_col="BRANCH_CODE", name_col="BRANCH_NAME"):
     is_regional = (branch_code == "ALL")
     if is_regional:
         select_name = f"COALESCE(BN_{table_name}.REGIONAL_OFFICE, 'Unknown Region')"
-        join_sql = f"LEFT JOIN BRANCH_NETWORK BN_{table_name} ON {alias}.BRANCH_CODE = BN_{table_name}.BRANCH_CODE"
+        join_sql = f"LEFT JOIN BRANCH_NETWORK BN_{table_name} ON {alias}.{branch_col} = BN_{table_name}.BRANCH_CODE"
         group_col = f"BN_{table_name}.REGIONAL_OFFICE"
     else:
-        select_name = f"{alias}.BRANCH_NAME"
+        select_name = f"{alias}.{name_col}"
         join_sql = ""
-        group_col = f"{alias}.BRANCH_NAME"
+        group_col = f"{alias}.{name_col}"
     return select_name, join_sql, group_col
 
 def get_branch_filter_sql(branch_code, prefix="WHERE", col="BRANCH_CODE"):
@@ -53,14 +55,29 @@ def get_branch_filter_sql(branch_code, prefix="WHERE", col="BRANCH_CODE"):
         return f" {prefix} {col} IN (SELECT BRANCH_CODE FROM BRANCH_NETWORK WHERE REGIONAL_OFFICE = ?) ", [region]
     return f" {prefix} {col} = ? ", [branch_code]
 
-def get_db_connection():
-    conn_str = os.getenv("ODBC_CONNECTION_STRING")
+from sqlalchemy import create_engine
+import urllib
 
-    if not conn_str:
-        server = r"DESKTOP-4QG3M53"
-        database = "ManualMis"
-        conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
-    return pyodbc.connect(conn_str)
+# Create a global SQLAlchemy engine with connection pooling
+_engine = None
+
+def get_engine():
+    global _engine
+    if _engine is None:
+        conn_str = os.getenv("ODBC_CONNECTION_STRING")
+        if not conn_str:
+            server = r"localhost,1433"
+            database = "ManualMis"
+            conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
+        
+        # Use SQLAlchemy for connection pooling (Pool size 5, max overflow 10)
+        params = urllib.parse.quote_plus(conn_str)
+        _engine = create_engine(f"mssql+pyodbc:///?odbc_connect={params}", pool_size=5, max_overflow=10, pool_timeout=30)
+    return _engine
+
+def get_db_connection():
+    """Returns a raw pyodbc connection from the SQLAlchemy pool."""
+    return get_engine().raw_connection()
 
 def init_branch_network():
     """Initializes the BRANCH_NETWORK table if it doesn't exist."""
@@ -148,12 +165,79 @@ def init_users():
     except Exception as e:
         print(f"Error initializing USERS: {e}")
 
+
+def init_activity_logs():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ACTIVITY_LOGS'")
+        if cursor.fetchone()[0] == 0:
+            print("ACTIVITY_LOGS table not found. Creating it...")
+            cursor.execute('''
+                CREATE TABLE ACTIVITY_LOGS (
+                    ID INT IDENTITY(1,1) PRIMARY KEY,
+                    USER_ID VARCHAR(100),
+                    BRANCH_CODE VARCHAR(100),
+                    ACTION VARCHAR(255),
+                    ENDPOINT VARCHAR(255),
+                    TIMESTAMP DATETIME DEFAULT GETDATE(),
+                    DETAILS TEXT
+                )
+            ''')
+            conn.commit()
+            print("Successfully created ACTIVITY_LOGS.")
+        conn.close()
+    except Exception as e:
+        print(f"Error initializing ACTIVITY_LOGS: {e}")
+
+def log_activity(user_id: str, branch_code: str, action: str, endpoint: str, details: str = ""):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO ACTIVITY_LOGS (USER_ID, BRANCH_CODE, ACTION, ENDPOINT, DETAILS)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, branch_code, action, endpoint, details))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Failed to log activity: {e}")
+
 @app.on_event("startup")
 async def startup_event():
     init_branch_network()
     init_users()
+    init_activity_logs()
+
+from fastapi import Request
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    username = request.headers.get("x-user-name", "Unknown")
+    branch = request.headers.get("x-user-branch", "Unknown")
+    
+    response = await call_next(request)
+    
+    # Ignore polling endpoints to avoid spam
+    if request.url.path not in ["/api/login", "/api/logout", "/api/log-client-action", "/api/activity-logs", "/api/notifications", "/api/upload-status", "/api/branches", "/api/regions"]:
+        if request.url.path.startswith("/api/"):
+            action = None
+            if request.method == "POST": action = "CREATE"
+            if request.method == "PUT": action = "EDIT"
+            if request.method == "DELETE": action = "DELETE"
+            if request.url.path == "/api/upload": action = "UPLOAD"
+            
+            if action:
+                details = f"User: {username}"
+                if request.query_params:
+                    details += f" | Params: {request.query_params}"
+                    
+                log_activity(username, branch, action, request.url.path, details)
+            
+    return response
 
 # --- UPLOAD ENGINE STATE ---
+
 upload_state = {
     "is_running": False,
     "total_files": 0,
@@ -438,7 +522,7 @@ def get_notifications(branch_code: str = "ALL"):
         npa_row = cursor.fetchone()
         if npa_row and npa_row[2] and npa_row[2] > 0:
             branch_code_res = npa_row[0]
-            branch_name = npa_row[1][:15] if npa_row[1] else "Unknown"
+            branch_name = str(npa_row[1]).strip() if npa_row[1] else "Unknown"
             notifications.append({
                 "id": 1,
                 "type": "warning",
@@ -518,7 +602,29 @@ def login(req: LoginRequest):
     finally:
         conn.close()
 
+
+@app.post("/api/logout")
+def logout(req: Request):
+    username = req.headers.get("x-user-name", "Unknown")
+    branch = req.headers.get("x-user-branch", "Unknown")
+    log_activity(username, branch, "LOGOUT", "/api/logout", f"User {username} logged out")
+    return {"success": True}
+
+from pydantic import BaseModel
+class ClientActionRequest(BaseModel):
+    action: str
+    details: str
+    endpoint: Optional[str] = "/client"
+
+@app.post("/api/log-client-action")
+def log_client_action(req: ClientActionRequest, request: Request):
+    username = request.headers.get("x-user-name", "Unknown")
+    branch = request.headers.get("x-user-branch", "Unknown")
+    log_activity(username, branch, req.action, req.endpoint, req.details)
+    return {"success": True}
+
 @app.get("/api/users")
+
 def get_users():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -749,7 +855,7 @@ def get_branch_comparison(branch_code: str = "ALL", period: str = "ALL", start_d
             ORDER BY total_deposit DESC
         """, params)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "deposits": float(r[1] or 0)} for r in rows]
+        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "deposits": float(r[1] or 0)} for r in rows]
     except Exception as e:
         import pyodbc
         if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
@@ -785,7 +891,7 @@ def get_opened_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_
             ORDER BY cnt DESC
         """, params)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
+        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
     except Exception as e:
         import pyodbc
         if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
@@ -820,7 +926,7 @@ def get_closed_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_
             ORDER BY cnt DESC
         """, params)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
+        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
     except Exception as e:
         import pyodbc
         if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
@@ -875,7 +981,7 @@ def get_total_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_d
             ORDER BY cnt DESC
         """, params_dep + params_loan)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
+        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "value": r[1], "loan_accounts": r[2], "deposit_accounts": r[3]} for r in rows]
     except Exception as e:
         import pyodbc
         if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
@@ -895,11 +1001,8 @@ def get_deposit_branch_wise(
 
     try:
         branch_condition, branch_params = get_branch_filter_sql(branch_code, "WHERE", "D.BRNO")
-        select_name, join_sql, group_col = get_grouping_sql(branch_code, "DEP_SHADOW", "D")
-        
-        # We need to map D.BRNO for the join, but get_grouping_sql expects D.BRANCH_CODE
-        # so let's adjust join_sql and group_col
-        join_sql = join_sql.replace("D.BRANCH_CODE", "D.BRNO")
+        # DEP_SHADOW has BRNO, but no BRANCH_NAME. We can just use BRNO as the name, or join with BRANCH_NETWORK
+        select_name, join_sql, group_col = get_grouping_sql(branch_code, "DEP_SHADOW", "D", branch_col="BRNO", name_col="BRNO")
         
         query = f"""
             SELECT
@@ -930,8 +1033,11 @@ def get_deposit_branch_wise(
         conn.close()
 
 @app.get("/api/kpi-summary")
-@lru_cache(maxsize=128)
 def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    cache_key = cache_manager._make_key("kpi-summary", branch_code=branch_code, period=period, start_date=start_date, end_date=end_date)
+    cached = cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
     """
     KPI summary.
 
@@ -1007,6 +1113,7 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL", start_date: O
                 )
             FROM LatestAccounts
             WHERE rn = 1
+            OPTION (MAXDOP 1)
         """
 
         cursor.execute(deposit_sql, params_dep)
@@ -1041,6 +1148,7 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL", start_date: O
                 )
             FROM BAL_IN_LOAN_ACC_GLCC_WISE_DET
             {where_loan}
+            OPTION (MAXDOP 1)
             """,
             params_loan,
         )
@@ -1077,6 +1185,7 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL", start_date: O
                 )
             FROM LIST_OF_NPA_ACCOUNTS
             {where_npa}
+            OPTION (MAXDOP 1)
             """,
             params_npa,
         )
@@ -1101,6 +1210,7 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL", start_date: O
                 SELECT COUNT(DISTINCT BRANCH_CODE)
                 FROM DEPOSITS_BALANCE_FILE_DEPD0586
                 {where_br}
+                OPTION (MAXDOP 1)
                 """,
                 params_br,
             )
@@ -1121,6 +1231,7 @@ def get_kpi_summary(branch_code: str = "ALL", period: str = "ALL", start_date: O
     finally:
         conn.close()
 
+    cache_manager.set(cache_key, data, cache_manager.TTL_MEDIUM)
     return data
 
 
@@ -1644,7 +1755,7 @@ def get_npa_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_dat
             ORDER BY npa DESC
         """, params_npa)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "NPA": float(r[1] or 0)} for r in rows]
+        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "NPA": float(r[1] or 0)} for r in rows]
     except Exception as e:
         import pyodbc
         if not (isinstance(e, pyodbc.Error) and len(e.args) > 0 and e.args[0] == '42S02'):
@@ -1695,7 +1806,7 @@ def get_loan_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_da
             ORDER BY loans DESC
         """, branch_params)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "Loans": float(r[1] or 0)} for r in rows]
+        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "Loans": float(r[1] or 0)} for r in rows]
     except:
         data = []
     finally:
@@ -1750,7 +1861,7 @@ def get_loan_type_branches(product_name: str, branch_code: str = "ALL", period: 
             ORDER BY amount DESC
         """, params)
         rows = cursor.fetchall()
-        data = [{"name": r[0][:15] if r[0] else "Unknown", "value": float(r[1] or 0)} for r in rows]
+        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "value": float(r[1] or 0)} for r in rows]
     except:
         data = []
     conn.close()
@@ -1795,6 +1906,10 @@ def pad_trend_dates(data, period):
 
 @app.get("/api/trend-data")
 def get_trend_data(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    cache_key = cache_manager._make_key("trend-data", branch_code=branch_code, period=period, start_date=start_date, end_date=end_date)
+    cached = cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -1853,6 +1968,7 @@ def get_trend_data(branch_code: str = "ALL", period: str = "ALL", start_date: Op
     finally:
         conn.close()
         
+    cache_manager.set(cache_key, data, cache_manager.TTL_MEDIUM)
     return data
 
 @app.get("/api/reports")
@@ -1978,6 +2094,10 @@ def get_report_stats(table_name: str, branch_code: str = "ALL"):
 
 @app.get("/api/account-metrics")
 def get_account_metrics(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    cache_key = cache_manager._make_key("account-metrics", branch_code=branch_code, period=period, start_date=start_date, end_date=end_date)
+    cached = cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
     conn = get_db_connection()
     cursor = conn.cursor()
     data = {"opened": 0, "closed": 0, "total": 0}
@@ -2029,6 +2149,7 @@ def get_account_metrics(branch_code: str = "ALL", period: str = "ALL", start_dat
             print(f"Error getting account metrics: {e}")
         
     conn.close()
+    cache_manager.set(cache_key, data, cache_manager.TTL_MEDIUM)
     return data
 
 def run_master_etl():
@@ -2081,6 +2202,9 @@ async def upload_file(background_tasks: BackgroundTasks, files: list[UploadFile]
         # Check if any file was successfully parsed and loaded to staging
         if any(res["status"] == "success" for res in results):
             background_tasks.add_task(run_master_etl)
+            # Invalidate all cached dashboard data so fresh data is served
+            cache_manager.invalidate_all()
+            print("[CACHE] Cache invalidated after successful file upload")
             
         return {"status": "success", "results": results}
     except Exception as e:
@@ -2215,10 +2339,9 @@ def get_dynamic_data(
 
         if branch_code != 'ALL':
             if 'BRANCH_CODE' in column_map:
-                where_clauses.append(
-                    '[BRANCH_CODE] = ?'
-                )
-                params.append(branch_code)
+                branch_sql, branch_params = get_branch_filter_sql(branch_code, "", "BRANCH_CODE")
+                where_clauses.append(branch_sql.strip())
+                params.extend(branch_params)
 
         # Search
         if search and searchable_cols:
@@ -2513,6 +2636,10 @@ def get_visualize_data(table_name: str, branch_code: str = "ALL", period: str = 
 
 @app.get("/api/npa-summary")
 def npa_summary(branch_code: Optional[str] = None, period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    cache_key = cache_manager._make_key("npa-summary", branch_code=branch_code, period=period, start_date=start_date, end_date=end_date)
+    cached = cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -2550,6 +2677,7 @@ def npa_summary(branch_code: Optional[str] = None, period: str = "ALL", start_da
                 "isPositive": False
             })
             
+        cache_manager.set(cache_key, summary, cache_manager.TTL_MEDIUM)
         return summary
     except Exception as e:
         print(f"Error fetching npa summary: {e}")
@@ -2606,6 +2734,10 @@ def audit_exceptions(branch_code: Optional[str] = None, period: str = "ALL", sta
 
 @app.get("/api/loans-dashboard")
 async def get_loans_dashboard(branch_code: str = "ALL", period: str = "all_time", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    cache_key = cache_manager._make_key("loans-dashboard", branch_code=branch_code, period=period, start_date=start_date, end_date=end_date)
+    cached = cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -2683,7 +2815,7 @@ async def get_loans_dashboard(branch_code: str = "ALL", period: str = "all_time"
 
         conn.close()
         
-        return {
+        result = {
             "overview": {
                 "total_loans": float(total_loans),
                 "total_npa": float(total_npa),
@@ -2694,6 +2826,8 @@ async def get_loans_dashboard(branch_code: str = "ALL", period: str = "all_time"
             "branch_npa": branch_npa,
             "branch_irregular": branch_irregular
         }
+        cache_manager.set(cache_key, result, cache_manager.TTL_MEDIUM)
+        return result
     except Exception as e:
         print("Error in /api/loans-dashboard:", str(e))
         import traceback
@@ -2702,6 +2836,10 @@ async def get_loans_dashboard(branch_code: str = "ALL", period: str = "all_time"
 
 @app.get("/api/deposits-dashboard")
 def get_deposits_dashboard(branch_code: str = "ALL", period: str = "30D", start_date: str = None, end_date: str = None):
+    cache_key = cache_manager._make_key("deposits-dashboard", branch_code=branch_code, period=period, start_date=start_date, end_date=end_date)
+    cached = cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -2755,7 +2893,7 @@ def get_deposits_dashboard(branch_code: str = "ALL", period: str = "30D", start_
 
         conn.close()
 
-        return {
+        result = {
             "overview": {
                 "total_deposits": float(total_dep),
                 "casa_deposits": float(casa_dep),
@@ -2764,6 +2902,8 @@ def get_deposits_dashboard(branch_code: str = "ALL", period: str = "30D", start_
             "products": products,
             "branches": branches
         }
+        cache_manager.set(cache_key, result, cache_manager.TTL_MEDIUM)
+        return result
     except Exception as e:
         print("Error in /api/deposits-dashboard:", str(e))
         import traceback
@@ -2772,6 +2912,10 @@ def get_deposits_dashboard(branch_code: str = "ALL", period: str = "30D", start_
 
 @app.get("/api/npa-trend")
 def get_npa_trend(branch_code: str = "ALL", period: str = "ALL", start_date: Optional[str] = None, end_date: Optional[str] = None):
+    cache_key = cache_manager._make_key("npa-trend", branch_code=branch_code, period=period, start_date=start_date, end_date=end_date)
+    cached = cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -2814,6 +2958,52 @@ def get_npa_trend(branch_code: str = "ALL", period: str = "ALL", start_date: Opt
         except:
             pass
         
+    cache_manager.set(cache_key, data, cache_manager.TTL_MEDIUM)
     return data
 
 # Trigger reload
+
+@app.get("/api/activity-logs")
+def get_activity_logs(limit: int = 100):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            SELECT ID, USER_ID, BRANCH_CODE, ACTION, ENDPOINT, TIMESTAMP, DETAILS
+            FROM ACTIVITY_LOGS
+            ORDER BY TIMESTAMP DESC
+            OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY
+        ''', (limit,))
+        rows = cursor.fetchall()
+        data = []
+        for r in rows:
+            data.append({
+                "id": r[0],
+                "user_id": r[1],
+                "branch_code": r[2],
+                "action": r[3],
+                "endpoint": r[4],
+                "timestamp": r[5].isoformat() if r[5] else None,
+                "details": r[6]
+            })
+        return data
+    except Exception as e:
+        print(f"Error fetching activity logs: {e}")
+        return []
+    finally:
+        conn.close()
+ 
+
+# ==========================================
+# Cache Management Endpoints
+# ==========================================
+@app.get("/api/cache-stats")
+def get_cache_stats():
+    """Return cache hit/miss statistics."""
+    return cache_manager.stats()
+
+@app.post("/api/cache-clear")
+def clear_cache():
+    """Clear all cached data. Useful after data upload."""
+    cache_manager.invalidate_all()
+    return {"status": "ok", "message": "All cache cleared"}

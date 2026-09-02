@@ -7,7 +7,7 @@ const COLORS = ['#0B1F3A', '#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444'
 
 const formatCurrency = (val) => {
   if (val === null || val === undefined) return '0';
-  const num = Number(val) / 1000;
+  const num = Number(val);
   if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
   return `₹ ${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
@@ -52,7 +52,16 @@ const KPICard = ({ title, value, isCurrency = true, changePercent, changeType, o
   </div>
 );
 
-const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
+const DepositsTab = ({ 
+  selectedBranch, 
+  selectedPeriod, 
+  exactDate,
+  startDate, 
+  endDate,
+  drillDownRegion,
+  setDrillDownRegion,
+  setActiveModal
+}) => {
   const [data, setData] = useState({
     overview: { total_deposits: 0, casa_deposits: 0, term_deposits: 0 },
     products: [],
@@ -139,6 +148,7 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
     if (!activeOthersModal) return null;
     const sorted = [...activeOthersModal].sort((a, b) => (b.value || 0) - (a.value || 0));
     const othersTotal = sorted.reduce((sum, item) => sum + (item.value || 0), 0);
+    const othersTotalAbs = sorted.reduce((sum, item) => sum + Math.abs(item.value || 0), 0);
     const top12 = sorted.slice(0, 12).map((p, i) => ({
       name: (p.name || 'Unknown').substring(0, 22),
       value: p.value || 0,
@@ -217,7 +227,7 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                     <div style={{ textAlign: 'right', fontWeight: '600', color: '#0F172A' }}>{formatCurrency(item.value)}</div>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ background: '#EFF6FF', color: '#3B82F6', padding: '1px 6px', borderRadius: '10px', fontSize: '11px', fontWeight: '500' }}>
-                        {othersTotal > 0 ? ((item.value / othersTotal) * 100).toFixed(1) : 0}%
+                        {othersTotalAbs > 0 ? ((Math.abs(item.value || 0) / othersTotalAbs) * 100).toFixed(1) : 0}%
                       </span>
                     </div>
                   </div>
@@ -339,7 +349,19 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
                   cursor={{ fill: '#F3F4F6' }}
                   formatter={(value) => [formatCurrency(value), "Deposits"]} 
                 />
-                <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                <Bar 
+                  dataKey="value" 
+                  fill="#3B82F6" 
+                  radius={[4, 4, 0, 0]} 
+                  maxBarSize={50}
+                  onClick={(data) => {
+                    if (selectedBranch === 'ALL' && data && data.name) {
+                      setDrillDownRegion(data.name);
+                      setActiveModal('deposits');
+                    }
+                  }}
+                  style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default' }}
+                >
                   {topBranchesData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -379,7 +401,7 @@ const DepositsTab = ({ selectedBranch, selectedPeriod, exactDate }) => {
             key={activeTabConfig.id + selectedBranch + selectedPeriod + exactDate}
             tableName={activeTabConfig.table} 
             title={activeTabConfig.label} 
-            branchCode={selectedBranch}
+            branchCode={drillDownRegion ? `REGION:${drillDownRegion}` : selectedBranch}
             period={selectedPeriod}
             exactDate={exactDate}
           />

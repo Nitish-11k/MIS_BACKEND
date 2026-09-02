@@ -264,12 +264,11 @@ const formatCr = (num) => {
 
 const isMasterType = (type) => ['total', 'deposits', 'loans'].includes(type);
 
-const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate, onClose }) => {
+const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate, onClose, drillDownRegion, setDrillDownRegion }) => {
   const [data, setData] = useState([]);
   const [masterStats, setMasterStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [drillDownRegion, setDrillDownRegion] = useState(null);
   const [showOtherCodes, setShowOtherCodes] = useState(false);
 
   const config = useMemo(() => {
@@ -297,7 +296,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
     const loadData = async () => {
       setLoading(true);
       try {
-        const bc = drillDownRegion ? `REGION:${drillDownRegion}` : (branchCode || 'ALL');
+        const bc = branchCode || 'ALL';
         if (config.isMaster) {
           const res = await fetch(`${API_BASE}/api/master-stats?branch_code=${bc}`, { signal: controller.signal });
           const result = await res.json();

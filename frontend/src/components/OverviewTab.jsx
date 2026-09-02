@@ -10,7 +10,7 @@ const COLORS = ['#0F172A', '#D4AF37', '#10B981', '#8B5CF6', '#EF4444'];
 
 const formatCurrency = (val) => {
   if (val === null || val === undefined) return '0';
-  const num = Number(val) / 1000;
+  const num = Number(val);
   if (Math.abs(num) >= 10000000) return `₹ ${(num / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
   return `₹ ${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
@@ -31,6 +31,8 @@ const OverviewTab = ({
   selectedBranch,
   setActiveModal,
   setActiveTab,
+  drillDownRegion,
+  setDrillDownRegion
 }) => {
   const [showNpaSummaryModal, setShowNpaSummaryModal] = useState(false);
   const [showOtherStatuses, setShowOtherStatuses] = useState(false);
@@ -143,12 +145,29 @@ const OverviewTab = ({
           </div>
           <div style={{ height: '240px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sortedNpaData && sortedNpaData.length > 0 ? sortedNpaData : []} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }} barGap={4}>
+              <BarChart 
+                data={sortedNpaData && sortedNpaData.length > 0 ? sortedNpaData : []} 
+                layout="vertical" 
+                margin={{ top: 0, right: 30, left: 40, bottom: 0 }} 
+                barGap={4}
+              >
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
                 <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={formatCurrency} />
                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#0F172A', fontWeight: 500 }} width={100} />
                 <Tooltip cursor={{ fill: '#F8FAFC' }} formatter={(val) => formatCurrency(val)} />
-                <Bar dataKey="value" fill="#0F172A" barSize={12} radius={[0, 4, 4, 0]}>
+                <Bar 
+                  dataKey="value" 
+                  fill="#0F172A" 
+                  barSize={12} 
+                  radius={[0, 4, 4, 0]}
+                  onClick={(data) => {
+                    if (selectedBranch === 'ALL' && data && data.name) {
+                      setDrillDownRegion(data.name);
+                      setActiveModal('npa');
+                    }
+                  }}
+                  style={{ cursor: selectedBranch === 'ALL' ? 'pointer' : 'default' }}
+                >
                   <LabelList dataKey="value" position="right" style={{ fontSize: '11px', fill: '#64748B' }} formatter={(val) => formatCurrency(val)} />
                 </Bar>
               </BarChart>

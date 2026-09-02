@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud, User, UserPlus } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud, User, UserPlus, UserCheck } from 'lucide-react';
 import ProfileTab from './ProfileTab';
+import ActivityLogTab from './ActivityLogTab';
 import UserManagementTab from './UserManagementTab';
 import FilterBar from './FilterBar';
 import SmartModal from './SmartModal';
@@ -28,6 +29,13 @@ const Dashboard = ({ user, onLogout }) => {
   const [selectedProduct, setSelectedProduct] = useState('All Products');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [drillDownRegion, setDrillDownRegion] = useState(null);
+
+  // Clear drillDownRegion if tab changes or branch changes or period changes
+  useEffect(() => {
+    setDrillDownRegion(null);
+  }, [activeTab, selectedBranch, selectedRegion, selectedPeriod]);
+
   const [kpiData, setKpiData] = useState({ total_deposits: 0, total_loans: 0, total_npa: 0 });
   const [accountMetrics, setAccountMetrics] = useState({ opened: 0, closed: 0 });
   const [branchNpaData, setBranchNpaData] = useState([]);
@@ -143,6 +151,28 @@ const Dashboard = ({ user, onLogout }) => {
     fetchData();
   }, [apiBranchCode, selectedPeriod, startDate, endDate]);
 
+  useEffect(() => {
+    const logNavigation = async () => {
+      try {
+        await fetch('http://localhost:8000/api/log-client-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'VIEW',
+            endpoint: `/dashboard/${activeTab}`,
+            details: `Target: ${apiBranchCode}`
+          })
+        });
+      } catch (e) {
+        // ignore tracking errors
+      }
+    };
+    // Only log if we have a valid tab and it's not the initial load of overview (optional, but good to prevent double logs)
+    if (activeTab) {
+      logNavigation();
+    }
+  }, [activeTab, apiBranchCode]);
+
   return (
     <div className="app-container" style={{ display: 'flex', height: '100vh', backgroundColor: '#F3F4F6', fontFamily: 'Inter, sans-serif', overflowX: 'hidden', position: 'relative' }}>
       
@@ -159,7 +189,10 @@ const Dashboard = ({ user, onLogout }) => {
             { id: 'compliance', label: 'Audit & Exceptions', icon: FileSignature },
             { id: 'reports', label: 'Reports & Accounts', icon: FileText },
             { id: 'upload', label: 'Data Sync', icon: UploadCloud },
-            ...(user?.role === 'HO' ? [{ id: 'users', label: 'User Management', icon: UserPlus }] : []),
+            ...(user?.role === 'HO' ? [
+              { id: 'users', label: 'User Management', icon: UserPlus },
+              { id: 'activity', label: 'Activity Logs', icon: UserCheck }
+            ] : []),
             { id: 'profile', label: 'My Profile', icon: User },
             { id: 'settings', label: 'Settings', icon: Settings },
           ].map(item => (
@@ -231,6 +264,7 @@ const Dashboard = ({ user, onLogout }) => {
           setSelectedProduct={setSelectedProduct}
           setActiveModal={setActiveModal}
           user={user}
+          onLogout={onLogout}
         />
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -250,17 +284,20 @@ const Dashboard = ({ user, onLogout }) => {
               selectedBranch={apiBranchCode}
               setActiveModal={setActiveModal}
               setActiveTab={setActiveTab}
+              drillDownRegion={drillDownRegion}
+              setDrillDownRegion={setDrillDownRegion}
             />
           )}
           
           {activeTab === 'network' && <BranchNetworkTab apiBranchCode={apiBranchCode} />}
-          {activeTab === 'loans' && <LoanPortfolioTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
-          {activeTab === 'deposits' && <DepositsTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
+          {activeTab === 'loans' && <LoanPortfolioTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} drillDownRegion={drillDownRegion} setDrillDownRegion={setDrillDownRegion} setActiveModal={setActiveModal} />}
+          {activeTab === 'deposits' && <DepositsTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} drillDownRegion={drillDownRegion} setDrillDownRegion={setDrillDownRegion} setActiveModal={setActiveModal} />}
           {activeTab === 'compliance' && <ComplianceTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
           {activeTab === 'reports' && <ReportsTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}
           {activeTab === 'upload' && <UploadTab />}
           {activeTab === 'profile' && <ProfileTab user={user} onLogout={onLogout} />}
           {activeTab === 'users' && user?.role === 'HO' && <UserManagementTab user={user} />}
+          {activeTab === 'activity' && user?.role === 'HO' && <ActivityLogTab />}
           {activeTab === 'settings' && <PlaceholderTab title="Settings" description="Configure system preferences, user roles, and UI themes." />}
         </div>
 
@@ -269,11 +306,16 @@ const Dashboard = ({ user, onLogout }) => {
       {activeModal && (
         <SmartModal 
           activeModal={activeModal} 
-          onClose={() => setActiveModal(null)} 
-          branchCode={apiBranchCode} 
+          onClose={() => {
+            setActiveModal(null);
+            setDrillDownRegion(null);
+          }} 
+          branchCode={drillDownRegion ? `REGION:${drillDownRegion}` : apiBranchCode} 
           startDate={startDate}
           endDate={endDate}
           period={selectedPeriod}
+          drillDownRegion={drillDownRegion}
+          setDrillDownRegion={setDrillDownRegion}
         />
       )}
     </div>

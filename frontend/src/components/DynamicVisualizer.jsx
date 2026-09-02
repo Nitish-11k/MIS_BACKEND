@@ -10,7 +10,7 @@ const COLORS = ['#F97316', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#14B8A6'
 
 const formatAmount = (num) => {
   if (num === null || num === undefined) return '0';
-  const val = Number(num) / 1000;
+  const val = Number(num);
   if (Math.abs(val) >= 10000000) return `₹ ${(val / 10000000).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} Cr`;
   return `₹ ${val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 };
