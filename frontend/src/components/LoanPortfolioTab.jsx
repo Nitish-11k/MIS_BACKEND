@@ -26,7 +26,6 @@ const LoanPortfolioTab = ({ selectedBranch, selectedPeriod, exactDate, startDate
     { id: 'irregular', label: 'Irregular Loans', table: 'LOAN_IRREGULAR_REPORT' },
     { id: 'sanction_letters', label: 'Sanction Letters', table: 'LOANS_SANCTION_LETTER' },
     { id: 'interest_changes', label: 'Interest Rate Changes', table: 'INTERESTRATECHANGELOANS_CFPD0337' },
-    { id: 'drawing_power', label: 'Drawing Power', table: 'DRAWING_POWER_LOND2388' },
   ];
 
   const activeTabConfig = tabs.find(t => t.id === activeSubTab);

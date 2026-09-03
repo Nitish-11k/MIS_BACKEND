@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud, User, UserPlus, UserCheck } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, ShieldAlert, Users, Landmark, Activity, ChevronLeft, ChevronRight, CreditCard, FileSignature, Menu, UploadCloud, User, UserPlus, UserCheck, Wallet } from 'lucide-react';
 import ProfileTab from './ProfileTab';
 import ActivityLogTab from './ActivityLogTab';
 import UserManagementTab from './UserManagementTab';
@@ -9,6 +9,7 @@ import OverviewTab from './OverviewTab';
 import PlaceholderTab from './PlaceholderTab';
 import LoanPortfolioTab from './LoanPortfolioTab';
 import DepositsTab from './DepositsTab';
+import ShadowDepositsTab from './ShadowDepositsTab';
 import ComplianceTab from './ComplianceTab';
 import ReportsTab from './ReportsTab';
 import UploadTab from './UploadTab';
@@ -184,8 +185,8 @@ const Dashboard = ({ user, onLogout }) => {
           {[
             { id: 'overview', label: 'MIS Dashboard', icon: LayoutDashboard },
             { id: 'network', label: 'Branch Network', icon: Activity },
+            { id: 'shadow_deposits', label: 'Shadow Deposits', icon: Wallet },
             { id: 'loans', label: 'Advances & NPA', icon: Landmark },
-            { id: 'deposits', label: 'Deposits', icon: CreditCard },
             { id: 'compliance', label: 'Audit & Exceptions', icon: FileSignature },
             { id: 'reports', label: 'Reports & Accounts', icon: FileText },
             { id: 'upload', label: 'Data Sync', icon: UploadCloud },
@@ -193,7 +194,6 @@ const Dashboard = ({ user, onLogout }) => {
               { id: 'users', label: 'User Management', icon: UserPlus },
               { id: 'activity', label: 'Activity Logs', icon: UserCheck }
             ] : []),
-            { id: 'profile', label: 'My Profile', icon: User },
             { id: 'settings', label: 'Settings', icon: Settings },
           ].map(item => (
             <div 
@@ -265,6 +265,7 @@ const Dashboard = ({ user, onLogout }) => {
           setActiveModal={setActiveModal}
           user={user}
           onLogout={onLogout}
+          setActiveTab={setActiveTab}
         />
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -290,6 +291,7 @@ const Dashboard = ({ user, onLogout }) => {
           )}
           
           {activeTab === 'network' && <BranchNetworkTab apiBranchCode={apiBranchCode} />}
+          {activeTab === 'shadow_deposits' && <ShadowDepositsTab selectedBranch={apiBranchCode} />}
           {activeTab === 'loans' && <LoanPortfolioTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} drillDownRegion={drillDownRegion} setDrillDownRegion={setDrillDownRegion} setActiveModal={setActiveModal} />}
           {activeTab === 'deposits' && <DepositsTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} drillDownRegion={drillDownRegion} setDrillDownRegion={setDrillDownRegion} setActiveModal={setActiveModal} />}
           {activeTab === 'compliance' && <ComplianceTab selectedBranch={apiBranchCode} selectedPeriod={selectedPeriod} startDate={startDate} endDate={endDate} />}

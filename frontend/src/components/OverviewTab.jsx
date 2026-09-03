@@ -304,7 +304,6 @@ const OverviewTab = ({
         <h4 style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', margin: 0, whiteSpace: 'nowrap' }}>Quick Links</h4>
         
         {[
-          { label: 'Deposits', action: () => setActiveTab('deposits') },
           { label: 'Loans Portfolio', action: () => setActiveTab('loans') },
           { label: 'NPA Drill-down', action: () => setActiveModal('npa') },
           { label: 'Compliance', action: () => setActiveTab('compliance') },

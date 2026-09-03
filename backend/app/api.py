@@ -27,10 +27,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 from fastapi.responses import JSONResponse
+import time
+from sqlalchemy import text
 
 @app.exception_handler(pyodbc.Error)
 async def pyodbc_exception_handler(request, exc):
-    print(f"Database table missing or unavailable for {request.url.path} - Waiting for data upload.")
+    if exc.args and isinstance(exc.args, tuple) and exc.args[0] == '42S02':
+        print(f"Database table missing or unavailable for {request.url.path} - Waiting for data upload.")
+    else:
+        print(f"Database error on {request.url.path}: {exc}")
+        traceback.print_exc()
     return JSONResponse(status_code=200, content=[])
 
 
@@ -66,14 +72,45 @@ def get_engine():
     if _engine is None:
         conn_str = os.getenv("ODBC_CONNECTION_STRING")
         if not conn_str:
-            server = r"localhost,1433"
+            server = r"127.0.0.1,1433"
             database = "ManualMis"
             conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
         
-        # Use SQLAlchemy for connection pooling (Pool size 5, max overflow 10)
+        # Use SQLAlchemy for connection pooling
         params = urllib.parse.quote_plus(conn_str)
-        _engine = create_engine(f"mssql+pyodbc:///?odbc_connect={params}", pool_size=5, max_overflow=10, pool_timeout=30)
+        _engine = create_engine(
+            f"mssql+pyodbc:///?odbc_connect={params}", 
+            pool_size=10, 
+            max_overflow=20, 
+            pool_timeout=60,
+            pool_recycle=1800,  # Recycle connections every 30 minutes
+            pool_pre_ping=True
+        )
     return _engine
+
+@app.on_event("startup")
+async def startup_event():
+    print("Initializing Database Engine...")
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        print("Database Engine successfully initialized with Connection Pool (pool_size=10, max_overflow=20).")
+    except Exception as e:
+        print(f"Failed to initialize Database Engine: {e}")
+
+@app.get("/api/db-health")
+def health_check():
+    start = time.time()
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        elapsed = (time.time() - start) * 1000
+        return {"status": "ok", "response_time_ms": round(elapsed, 2)}
+    except Exception as e:
+        elapsed = (time.time() - start) * 1000
+        return {"status": "error", "message": str(e), "response_time_ms": round(elapsed, 2)}
 
 def get_db_connection():
     """Returns a raw pyodbc connection from the SQLAlchemy pool."""
@@ -1793,9 +1830,7 @@ def get_loan_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_da
     cursor = conn.cursor()
     try:
         branch_condition, branch_params = get_branch_filter_sql(branch_code, "WHERE", "L.BRNO")
-        select_name, join_sql, group_col = get_grouping_sql(branch_code, "LOAN_SHADOW", "L")
-        
-        join_sql = join_sql.replace("L.BRANCH_CODE", "L.BRNO")
+        select_name, join_sql, group_col = get_grouping_sql(branch_code, "LOAN_SHADOW", "L", branch_col="BRNO", name_col="BRNO")
         
         cursor.execute(f"""
             SELECT {select_name} as name, SUM(TRY_CAST(REPLACE(ISNULL(L.CURRBAL, '0'), ',', '') AS FLOAT)) as loans
@@ -1806,8 +1841,9 @@ def get_loan_branch_wise(branch_code: str = "ALL", period: str = "ALL", start_da
             ORDER BY loans DESC
         """, branch_params)
         rows = cursor.fetchall()
-        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "Loans": float(r[1] or 0)} for r in rows]
-    except:
+        data = [{"name": str(r[0]).strip() if r[0] else "Unknown", "value": float(r[1] or 0)} for r in rows]
+    except Exception as e:
+        print(f"Error in loan-branch-wise: {e}")
         data = []
     finally:
         conn.close()
@@ -2740,80 +2776,82 @@ async def get_loans_dashboard(branch_code: str = "ALL", period: str = "all_time"
         return cached
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Build where clause for date filtering (using get_date_filter_sql)
-        # Note: Since BAL_IN_LOAN_ACC_GLCC_WISE_SUM doesn't have PROC_DATE in all setups, 
-        # we might just filter if needed, but usually GLCC wise sum is just a snapshot.
-        # For full accuracy, let's filter if PROC_DATE exists.
-        
-        # 1. Total Loans
-        query_total = "SELECT SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM"
-        where_glcc, params_glcc = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_SUM", "WHERE", start_date=start_date, end_date=end_date)
-        branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_glcc.upper() else "WHERE", "BRANCH_CODE")
-        where_glcc += branch_sql
-        params_glcc.extend(branch_params)
+        try:
+            cursor = conn.cursor()
             
-        cursor.execute(query_total + where_glcc, params_glcc)
-        total_loans = cursor.fetchone()[0] or 0.0
-
-        # 2. Total NPA
-        query_npa = "SELECT SUM(TRY_CAST(REPLACE(OUTSTANDING, ',', '') AS FLOAT)) FROM LIST_OF_NPA_ACCOUNTS"
-        where_npa, params_npa = get_date_filter_sql(period, "LIST_OF_NPA_ACCOUNTS", "WHERE", start_date=start_date, end_date=end_date)
-        branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_npa.upper() else "WHERE", "BRANCH_CODE")
-        where_npa += branch_sql
-        params_npa.extend(branch_params)
+            # Build where clause for date filtering (using get_date_filter_sql)
+            # Note: Since BAL_IN_LOAN_ACC_GLCC_WISE_SUM doesn't have PROC_DATE in all setups, 
+            # we might just filter if needed, but usually GLCC wise sum is just a snapshot.
+            # For full accuracy, let's filter if PROC_DATE exists.
             
-        cursor.execute(query_npa + where_npa, params_npa)
-        total_npa = cursor.fetchone()[0] or 0.0
+            # 1. Total Loans
+            query_total = "SELECT SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM"
+            where_glcc, params_glcc = get_date_filter_sql(period, "BAL_IN_LOAN_ACC_GLCC_WISE_SUM", "WHERE", start_date=start_date, end_date=end_date)
+            branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_glcc.upper() else "WHERE", "BRANCH_CODE")
+            where_glcc += branch_sql
+            params_glcc.extend(branch_params)
+    
+            cursor.execute(query_total + where_glcc, params_glcc)
+            total_loans = cursor.fetchone()[0] or 0.0
+    
+            # 2. Total NPA
+            query_npa = "SELECT SUM(TRY_CAST(REPLACE(OUTSTANDING, ',', '') AS FLOAT)) FROM LIST_OF_NPA_ACCOUNTS"
+            where_npa, params_npa = get_date_filter_sql(period, "LIST_OF_NPA_ACCOUNTS", "WHERE", start_date=start_date, end_date=end_date)
+            branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_npa.upper() else "WHERE", "BRANCH_CODE")
+            where_npa += branch_sql
+            params_npa.extend(branch_params)
+    
+            cursor.execute(query_npa + where_npa, params_npa)
+            total_npa = cursor.fetchone()[0] or 0.0
+    
+            # 3. Total Irregular
+            query_irreg = "SELECT SUM(TRY_CAST(REPLACE(IRREGULARITY, ',', '') AS FLOAT)) FROM LOAN_IRREGULAR_REPORT"
+            where_irreg, params_irreg = get_date_filter_sql(period, "LOAN_IRREGULAR_REPORT", "WHERE", start_date=start_date, end_date=end_date)
+            branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_irreg.upper() else "WHERE", "BRANCH_CODE")
+            where_irreg += branch_sql
+            params_irreg.extend(branch_params)
+    
+            cursor.execute(query_irreg + where_irreg, params_irreg)
+            total_irreg = cursor.fetchone()[0] or 0.0
+    
+            # 4. Product-wise aggregate
+            query_prod = "SELECT NAME, SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) as sum_amt FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM " + where_glcc + " GROUP BY NAME ORDER BY sum_amt DESC"
+            cursor.execute(query_prod, params_glcc)
+            products = [{"name": row[0], "value": float(row[1] or 0)} for row in cursor.fetchall() if row[0] and row[1]]
+    
+            # 5. Branch-wise aggregate (Loans)
+            query_branch = "SELECT BRANCH_NAME, SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) as sum_amt FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM " + where_glcc + " GROUP BY BRANCH_NAME ORDER BY sum_amt DESC"
+            cursor.execute(query_branch, params_glcc)
+            branches = [{"name": row[0], "value": float(row[1] or 0)} for row in cursor.fetchall() if row[0] and row[1]]
+    
+            # 6. Branch-wise aggregate (NPA)
+            query_branch_npa = """
+                SELECT 
+                    COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = LIST_OF_NPA_ACCOUNTS.BRANCH_CODE), LIST_OF_NPA_ACCOUNTS.BRANCH_CODE) as BRANCH_NAME,
+                    SUM(TRY_CAST(REPLACE(ISNULL(OUTSTANDING, '0'), ',', '') AS FLOAT)) as sum_amt
+                FROM LIST_OF_NPA_ACCOUNTS
+                """ + where_npa + """
+                GROUP BY LIST_OF_NPA_ACCOUNTS.BRANCH_CODE
+                ORDER BY sum_amt DESC
+            """
+            cursor.execute(query_branch_npa, params_npa)
+            branch_npa = [{"name": row[0] if row[0] else "Unknown", "value": float(row[1] or 0)} for row in cursor.fetchall() if row[1]]
+    
+            # 7. Branch-wise aggregate (Irregular)
+            query_branch_irreg = """
+                SELECT 
+                    COALESCE(BRANCH_NAME, BRANCH_CODE) as BRANCH_NAME,
+                    SUM(TRY_CAST(REPLACE(ISNULL(IRREGULARITY, '0'), ',', '') AS FLOAT)) as sum_amt
+                FROM LOAN_IRREGULAR_REPORT
+                """ + where_irreg + """
+                GROUP BY BRANCH_NAME, BRANCH_CODE
+                ORDER BY sum_amt DESC
+            """
+            cursor.execute(query_branch_irreg, params_irreg)
+            branch_irregular = [{"name": row[0] if row[0] else "Unknown", "value": float(row[1] or 0)} for row in cursor.fetchall() if row[1]]
 
-        # 3. Total Irregular
-        query_irreg = "SELECT SUM(TRY_CAST(REPLACE(IRREGULARITY, ',', '') AS FLOAT)) FROM LOAN_IRREGULAR_REPORT"
-        where_irreg, params_irreg = get_date_filter_sql(period, "LOAN_IRREGULAR_REPORT", "WHERE", start_date=start_date, end_date=end_date)
-        branch_sql, branch_params = get_branch_filter_sql(branch_code, "AND" if "WHERE" in where_irreg.upper() else "WHERE", "BRANCH_CODE")
-        where_irreg += branch_sql
-        params_irreg.extend(branch_params)
-            
-        cursor.execute(query_irreg + where_irreg, params_irreg)
-        total_irreg = cursor.fetchone()[0] or 0.0
-
-        # 4. Product-wise aggregate
-        query_prod = "SELECT NAME, SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) as sum_amt FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM " + where_glcc + " GROUP BY NAME ORDER BY sum_amt DESC"
-        cursor.execute(query_prod, params_glcc)
-        products = [{"name": row[0], "value": float(row[1] or 0)} for row in cursor.fetchall() if row[0] and row[1]]
-
-        # 5. Branch-wise aggregate (Loans)
-        query_branch = "SELECT BRANCH_NAME, SUM(TRY_CAST(REPLACE(TOTAL_AMOUNT, ',', '') AS FLOAT)) as sum_amt FROM BAL_IN_LOAN_ACC_GLCC_WISE_SUM " + where_glcc + " GROUP BY BRANCH_NAME ORDER BY sum_amt DESC"
-        cursor.execute(query_branch, params_glcc)
-        branches = [{"name": row[0], "value": float(row[1] or 0)} for row in cursor.fetchall() if row[0] and row[1]]
-        
-        # 6. Branch-wise aggregate (NPA)
-        query_branch_npa = """
-            SELECT 
-                COALESCE((SELECT TOP 1 BRANCH_NAME FROM LOANSBALANCEFILE_LOND2390 b WHERE b.BRANCH_CODE = LIST_OF_NPA_ACCOUNTS.BRANCH_CODE), LIST_OF_NPA_ACCOUNTS.BRANCH_CODE) as BRANCH_NAME,
-                SUM(TRY_CAST(REPLACE(ISNULL(OUTSTANDING, '0'), ',', '') AS FLOAT)) as sum_amt
-            FROM LIST_OF_NPA_ACCOUNTS
-            """ + where_npa + """
-            GROUP BY LIST_OF_NPA_ACCOUNTS.BRANCH_CODE
-            ORDER BY sum_amt DESC
-        """
-        cursor.execute(query_branch_npa, params_npa)
-        branch_npa = [{"name": row[0] if row[0] else "Unknown", "value": float(row[1] or 0)} for row in cursor.fetchall() if row[1]]
-        
-        # 7. Branch-wise aggregate (Irregular)
-        query_branch_irreg = """
-            SELECT 
-                COALESCE(BRANCH_NAME, BRANCH_CODE) as BRANCH_NAME,
-                SUM(TRY_CAST(REPLACE(ISNULL(IRREGULARITY, '0'), ',', '') AS FLOAT)) as sum_amt
-            FROM LOAN_IRREGULAR_REPORT
-            """ + where_irreg + """
-            GROUP BY BRANCH_NAME, BRANCH_CODE
-            ORDER BY sum_amt DESC
-        """
-        cursor.execute(query_branch_irreg, params_irreg)
-        branch_irregular = [{"name": row[0] if row[0] else "Unknown", "value": float(row[1] or 0)} for row in cursor.fetchall() if row[1]]
-
-        conn.close()
+        finally:
+            conn.close()
         
         result = {
             "overview": {
@@ -2842,56 +2880,58 @@ def get_deposits_dashboard(branch_code: str = "ALL", period: str = "30D", start_
         return cached
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
+    
+            where_clause = ""
+            params = []
+            branch_sql, branch_params = get_branch_filter_sql(branch_code, "WHERE")
+            where_clause = branch_sql
+            params.extend(branch_params)
 
-        where_clause = ""
-        params = []
-        branch_sql, branch_params = get_branch_filter_sql(branch_code, "WHERE")
-        where_clause = branch_sql
-        params.extend(branch_params)
+            # 1. Overview KPIs
+            query_overview = f"""
+                SELECT 
+                    SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as total_dep,
+                    SUM(CASE WHEN ACCOUNT_TYPE LIKE 'SB%' OR ACCOUNT_TYPE LIKE 'CA%' OR ACCOUNT_TYPE LIKE 'CURRENT%' THEN TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT) ELSE 0 END) as casa_dep,
+                    SUM(CASE WHEN ACCOUNT_TYPE LIKE '%TDR%' OR ACCOUNT_TYPE LIKE 'RD%' OR ACCOUNT_TYPE LIKE '%FDR%' THEN TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT) ELSE 0 END) as term_dep
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_clause}
+            """
+            cursor.execute(query_overview, params)
+            row = cursor.fetchone()
+            total_dep = row[0] or 0
+            casa_dep = row[1] or 0
+            term_dep = row[2] or 0
+    
+            # 2. Product Distribution
+            query_products = f"""
+                SELECT 
+                    ISNULL(ACCOUNT_TYPE, 'Other') as name,
+                    SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as value
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_clause}
+                GROUP BY ACCOUNT_TYPE
+                ORDER BY value DESC
+            """
+            cursor.execute(query_products, params)
+            products = [{"name": r[0], "value": float(r[1] or 0)} for r in cursor.fetchall() if r[1]]
+    
+            # 3. Branch Distribution
+            query_branches = f"""
+                SELECT 
+                    COALESCE(BRANCH_NAME, BRANCH_CODE) as BRANCH_NAME,
+                    SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as value
+                FROM DEPOSITS_BALANCE_FILE_DEPD0586
+                {where_clause}
+                GROUP BY BRANCH_NAME, BRANCH_CODE
+                ORDER BY value DESC
+            """
+            cursor.execute(query_branches, params)
+            branches = [{"name": r[0] if r[0] else "Unknown", "value": float(r[1] or 0)} for r in cursor.fetchall() if r[1]]
 
-        # 1. Overview KPIs
-        query_overview = f"""
-            SELECT 
-                SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as total_dep,
-                SUM(CASE WHEN ACCOUNT_TYPE LIKE 'SB%' OR ACCOUNT_TYPE LIKE 'CA%' OR ACCOUNT_TYPE LIKE 'CURRENT%' THEN TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT) ELSE 0 END) as casa_dep,
-                SUM(CASE WHEN ACCOUNT_TYPE LIKE '%TDR%' OR ACCOUNT_TYPE LIKE 'RD%' OR ACCOUNT_TYPE LIKE '%FDR%' THEN TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT) ELSE 0 END) as term_dep
-            FROM DEPOSITS_BALANCE_FILE_DEPD0586
-            {where_clause}
-        """
-        cursor.execute(query_overview, params)
-        row = cursor.fetchone()
-        total_dep = row[0] or 0
-        casa_dep = row[1] or 0
-        term_dep = row[2] or 0
-
-        # 2. Product Distribution
-        query_products = f"""
-            SELECT 
-                ISNULL(ACCOUNT_TYPE, 'Other') as name,
-                SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as value
-            FROM DEPOSITS_BALANCE_FILE_DEPD0586
-            {where_clause}
-            GROUP BY ACCOUNT_TYPE
-            ORDER BY value DESC
-        """
-        cursor.execute(query_products, params)
-        products = [{"name": r[0], "value": float(r[1] or 0)} for r in cursor.fetchall() if r[1]]
-
-        # 3. Branch Distribution
-        query_branches = f"""
-            SELECT 
-                COALESCE(BRANCH_NAME, BRANCH_CODE) as BRANCH_NAME,
-                SUM(TRY_CAST(REPLACE(ISNULL(AVAILABLE_BALANCE, '0'), ',', '') AS FLOAT)) as value
-            FROM DEPOSITS_BALANCE_FILE_DEPD0586
-            {where_clause}
-            GROUP BY BRANCH_NAME, BRANCH_CODE
-            ORDER BY value DESC
-        """
-        cursor.execute(query_branches, params)
-        branches = [{"name": r[0] if r[0] else "Unknown", "value": float(r[1] or 0)} for r in cursor.fetchall() if r[1]]
-
-        conn.close()
+        finally:
+            conn.close()
 
         result = {
             "overview": {
@@ -3007,3 +3047,104 @@ def clear_cache():
     """Clear all cached data. Useful after data upload."""
     cache_manager.invalidate_all()
     return {"status": "ok", "message": "All cache cleared"}
+
+@app.get("/api/shadow-deposits")
+def get_shadow_deposits(branch_code: str = "ALL"):
+    cache_key = cache_manager._make_key("shadow-deposits", branch_code=branch_code)
+    cached = cache_manager.get(cache_key)
+    if cached is not None:
+        return cached
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    data = {
+        "overview": {"total_accounts": 0, "total_balance": 0},
+        "status_distribution": [],
+        "top_schemes": [],
+        "top_regions": [],
+        "least_regions": [],
+        "top_branches": [],
+        "least_branches": []
+    }
+    try:
+        branch_condition, branch_params = get_branch_filter_sql(branch_code, "WHERE", "D.BRNO")
+        
+        # 1. Overview
+        cursor.execute(f'''
+            SELECT COUNT(*), SUM(TRY_CAST(REPLACE(ISNULL(D.CURRBAL, '0'), ',', '') AS FLOAT))
+            FROM dep_shadow_file D
+            {branch_condition}
+        ''', branch_params)
+        row = cursor.fetchone()
+        if row:
+            data["overview"]["total_accounts"] = row[0] or 0
+            data["overview"]["total_balance"] = float(row[1] or 0)
+            
+        # 2. Status Distribution
+        cursor.execute(f'''
+            SELECT ISNULL(D.STATUS, 'Unknown'), COUNT(*)
+            FROM dep_shadow_file D
+            {branch_condition}
+            GROUP BY D.STATUS
+        ''', branch_params)
+        data["status_distribution"] = [{"name": r[0].strip(), "value": r[1]} for r in cursor.fetchall()]
+        
+        # 3. Top Schemes
+        cursor.execute(f'''
+            SELECT TOP 10 ISNULL(D.SCHEMEDESC, 'Unknown'), SUM(TRY_CAST(REPLACE(ISNULL(D.CURRBAL, '0'), ',', '') AS FLOAT)) as bal
+            FROM dep_shadow_file D
+            {branch_condition}
+            GROUP BY D.SCHEMEDESC
+            ORDER BY bal DESC
+        ''', branch_params)
+        data["top_schemes"] = [{"name": r[0].strip(), "value": float(r[1] or 0)} for r in cursor.fetchall()]
+        
+        # 4. Regional Distribution (All regions for ranking)
+        cursor.execute(f'''
+            SELECT 
+                ISNULL(BN.REGIONAL_OFFICE, 'Unknown Region') as region_name,
+                SUM(TRY_CAST(REPLACE(ISNULL(D.CURRBAL, '0'), ',', '') AS FLOAT)) as bal,
+                COUNT(*) as cnt
+            FROM dep_shadow_file D
+            LEFT JOIN BRANCH_NETWORK BN ON D.BRNO = BN.BRANCH_CODE
+            {branch_condition}
+            GROUP BY BN.REGIONAL_OFFICE
+            ORDER BY bal DESC
+        ''', branch_params)
+        reg_rows = cursor.fetchall()
+        sorted_regions = [
+            {"name": r[0].strip() if r[0] else "Unknown", "value": float(r[1] or 0), "accounts": r[2]}
+            for r in reg_rows if r[0] and str(r[0]).strip()
+        ]
+        data["top_regions"] = sorted_regions[:5]
+        data["least_regions"] = sorted_regions[-5:][::-1] if len(sorted_regions) > 5 else sorted_regions[::-1]
+        
+        # 5. Branch-wise (Top 5 & Least 5 Branches)
+        cursor.execute(f'''
+            SELECT 
+                COALESCE(BN.BRANCH_NAME, D.BRNO) as branch_name,
+                ISNULL(BN.REGIONAL_OFFICE, 'Unknown') as region_name,
+                SUM(TRY_CAST(REPLACE(ISNULL(D.CURRBAL, '0'), ',', '') AS FLOAT)) as bal,
+                COUNT(*) as cnt
+            FROM dep_shadow_file D
+            LEFT JOIN BRANCH_NETWORK BN ON D.BRNO = BN.BRANCH_CODE
+            {branch_condition}
+            GROUP BY BN.BRANCH_NAME, BN.REGIONAL_OFFICE, D.BRNO
+            HAVING SUM(TRY_CAST(REPLACE(ISNULL(D.CURRBAL, '0'), ',', '') AS FLOAT)) > 0
+            ORDER BY bal DESC
+        ''', branch_params)
+        branch_rows = cursor.fetchall()
+        sorted_branches = [
+            {"name": r[0].strip() if r[0] else "Unknown", "region": r[1].strip() if r[1] else "", "value": float(r[2] or 0), "accounts": r[3]}
+            for r in branch_rows
+        ]
+        data["top_branches"] = sorted_branches[:5]
+        data["least_branches"] = sorted_branches[-5:][::-1] if len(sorted_branches) > 5 else sorted_branches[::-1]
+
+        cache_manager.set(cache_key, data)
+    except Exception as e:
+        print("Error in /api/shadow-deposits:", str(e))
+    finally:
+        conn.close()
+    
+    return data

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Bell, X, Info, CheckCircle, AlertTriangle, Menu, MoreVertical, RefreshCw, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Bell, X, Info, CheckCircle, AlertTriangle, Menu, MoreVertical, RefreshCw, Filter, ChevronDown, ChevronUp, User } from 'lucide-react';
 
 const FilterBar = ({
   isMobile,
@@ -22,7 +22,8 @@ const FilterBar = ({
   setSelectedProduct,
   setActiveModal,
   user,
-  onLogout
+  onLogout,
+  setActiveTab
 }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -142,10 +143,19 @@ const FilterBar = ({
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', padding: '8px', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}
             >
-              <MoreVertical size={18} color="#64748B" />
+              <User size={18} color="#64748B" />
             </button>
             {isMenuOpen && (
               <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', width: '120px', zIndex: 50 }}>
+                <div 
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    if(setActiveTab) setActiveTab('profile');
+                  }} 
+                  style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #E2E8F0' }}
+                >
+                  View Profile
+                </div>
                 <div 
                   onClick={async () => {
                     setIsMenuOpen(false);

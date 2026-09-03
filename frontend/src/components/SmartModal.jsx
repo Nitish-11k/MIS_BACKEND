@@ -375,7 +375,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
 
   const pieData = sortedData
     .filter((row) => row.numericValue > 0)
-    .slice(0, 6)
+    .slice(0, 12)
     .map((row) => ({
       name: row.name,
       value: row.numericValue,
@@ -447,7 +447,7 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
     if (depStatuses.Others?.count) depPieData.push({ name: 'Others', value: depStatuses.Others.count, fill: STATUS_COLORS.Others });
 
     // Loan pie data - show top 8 individually, rest as "Others"
-    const MAX_LOAN_SHOW = 8;
+    const MAX_LOAN_SHOW = 12;
     const loanPieData = [];
     let loanOthersCount = 0;
     let loanOthersAmount = 0;
@@ -984,14 +984,6 @@ const SmartModal = ({ activeModal: type, branchCode, period, startDate, endDate,
                             formatter={(value) => {
                               if (!totalValue) return '0%';
                               return `${((value / totalValue) * 100).toFixed(1)}%`;
-                            }}
-                          />
-
-                          <Legend
-                            verticalAlign="bottom"
-                            height={36}
-                            wrapperStyle={{
-                              fontSize: '10px',
                             }}
                           />
                         </PieChart>
