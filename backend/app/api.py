@@ -61,6 +61,9 @@ def get_branch_filter_sql(branch_code, prefix="WHERE", col="BRANCH_CODE"):
         return f" {prefix} {col} IN (SELECT BRANCH_CODE FROM BRANCH_NETWORK WHERE REGIONAL_OFFICE = ?) ", [region]
     return f" {prefix} {col} = ? ", [branch_code]
 
+import atexit
+import signal
+import sys
 from sqlalchemy import create_engine
 import urllib
 
@@ -76,28 +79,109 @@ def get_engine():
             database = "ManualMis"
             conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
         
+        # Bypass TLS/SSL handshake negotiation delay in prelogin
+        if "Encrypt=" not in conn_str:
+            conn_str = conn_str.rstrip(";") + ";Encrypt=no;"
+        # Provide adequate buffer against burst traffic prelogin timeouts
+        if "Connection Timeout=" not in conn_str and "Login Timeout=" not in conn_str:
+            conn_str = conn_str.rstrip(";") + ";Connection Timeout=30;"
+        # Tag connections with application name so they can be tracked and killed if orphaned
+        if "APP=" not in conn_str and "Application Name=" not in conn_str:
+            conn_str = conn_str.rstrip(";") + ";APP=BankingMIS;"
+
         # Use SQLAlchemy for connection pooling
         params = urllib.parse.quote_plus(conn_str)
         _engine = create_engine(
             f"mssql+pyodbc:///?odbc_connect={params}", 
             pool_size=10, 
             max_overflow=20, 
-            pool_timeout=60,
-            pool_recycle=1800,  # Recycle connections every 30 minutes
+            pool_timeout=30,
+            pool_recycle=300,  # Recycle connections every 5 minutes
             pool_pre_ping=True
         )
     return _engine
+
+def close_all_connections():
+    """Kills and disposes all active DB connections when app closes, reloads, or crashes."""
+    global _engine
+    if _engine is not None:
+        try:
+            print("[DB] Closing and disposing all database connections in pool...")
+            _engine.dispose(close=True)
+            _engine = None
+            print("[DB] All database connections successfully closed and disposed.")
+        except Exception as e:
+            print(f"[DB] Error disposing database engine: {e}")
+
+# Register process exit hook (triggers on normal exit, unhandled exception, or crash)
+atexit.register(close_all_connections)
+
+# Register OS signal handlers for graceful termination
+def _signal_handler(sig, frame):
+    close_all_connections()
+    sys.exit(0)
+
+try:
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
+except Exception:
+    pass
+
+@app.on_event("shutdown")
+def shutdown_event():
+    """FastAPI shutdown hook (called by uvicorn on reload or server stop)."""
+    print("[FastAPI] Shutdown signal received. Closing all database connections...")
+    close_all_connections()
+
+def cleanup_orphan_sessions():
+    """Kills any orphaned sleeping sessions for BankingMIS from previous crashed runs."""
+    try:
+        conn_str = os.getenv("ODBC_CONNECTION_STRING")
+        if not conn_str:
+            server = r"127.0.0.1,1433"
+            database = "ManualMis"
+            conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;TrustServerCertificate=yes;'
+        
+        if "Encrypt=" not in conn_str:
+            conn_str = conn_str.rstrip(";") + ";Encrypt=no;"
+        if "Connection Timeout=" not in conn_str and "Login Timeout=" not in conn_str:
+            conn_str = conn_str.rstrip(";") + ";Connection Timeout=30;"
+
+        with pyodbc.connect(conn_str, timeout=3) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT session_id 
+                FROM sys.dm_exec_sessions 
+                WHERE program_name = 'BankingMIS' 
+                  AND session_id <> @@SPID 
+                  AND status = 'sleeping'
+            """)
+            orphans = [row[0] for row in cursor.fetchall()]
+            for spid in orphans:
+                try:
+                    cursor.execute(f"KILL {spid}")
+                    print(f"[DB] Killed orphaned sleeping session: {spid}")
+                except Exception:
+                    pass
+    except Exception:
+        pass
 
 @app.on_event("startup")
 async def startup_event():
     print("Initializing Database Engine...")
     try:
+        cleanup_orphan_sessions()
         engine = get_engine()
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         print("Database Engine successfully initialized with Connection Pool (pool_size=10, max_overflow=20).")
     except Exception as e:
         print(f"Failed to initialize Database Engine: {e}")
+
+    init_branch_network()
+    init_users()
+    init_activity_logs()
+
 
 @app.get("/api/db-health")
 def health_check():
@@ -112,12 +196,26 @@ def health_check():
         elapsed = (time.time() - start) * 1000
         return {"status": "error", "message": str(e), "response_time_ms": round(elapsed, 2)}
 
-def get_db_connection():
-    """Returns a raw pyodbc connection from the SQLAlchemy pool."""
-    return get_engine().raw_connection()
+def get_db_connection(max_retries: int = 3, retry_delay: float = 0.3):
+    """Returns a raw pyodbc connection from the SQLAlchemy pool with automatic retry on transient prelogin timeouts."""
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            return get_engine().raw_connection()
+        except Exception as e:
+            last_exc = e
+            err_str = str(e)
+            is_prelogin_err = "258" in err_str or "08001" in err_str or "prelogin" in err_str.lower()
+            if is_prelogin_err and attempt < max_retries - 1:
+                sleep_sec = retry_delay * (attempt + 1)
+                print(f"[DB Warning] Prelogin timeout/delay detected (attempt {attempt + 1}/{max_retries}). Retrying in {sleep_sec:.2f}s...")
+                time.sleep(sleep_sec)
+            else:
+                raise last_exc
 
 def init_branch_network():
     """Initializes the BRANCH_NETWORK table if it doesn't exist."""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -164,13 +262,19 @@ def init_branch_network():
                 print(f"Successfully inserted {len(seed_data)} branches.")
             else:
                 print("Seed data not found. BRANCH_NETWORK created empty.")
-        conn.close()
     except Exception as e:
         print(f"Error initializing BRANCH_NETWORK: {e}")
         traceback.print_exc()
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def init_users():
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -198,12 +302,18 @@ def init_users():
             ''')
             conn.commit()
             print("Successfully inserted default users.")
-        conn.close()
     except Exception as e:
         print(f"Error initializing USERS: {e}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def init_activity_logs():
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -223,11 +333,17 @@ def init_activity_logs():
             ''')
             conn.commit()
             print("Successfully created ACTIVITY_LOGS.")
-        conn.close()
     except Exception as e:
         print(f"Error initializing ACTIVITY_LOGS: {e}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 def log_activity(user_id: str, branch_code: str, action: str, endpoint: str, details: str = ""):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -236,15 +352,14 @@ def log_activity(user_id: str, branch_code: str, action: str, endpoint: str, det
             VALUES (?, ?, ?, ?, ?)
         ''', (user_id, branch_code, action, endpoint, details))
         conn.commit()
-        conn.close()
     except Exception as e:
         print(f"Failed to log activity: {e}")
-
-@app.on_event("startup")
-async def startup_event():
-    init_branch_network()
-    init_users()
-    init_activity_logs()
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 from fastapi import Request
 
